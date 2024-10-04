@@ -1,11 +1,9 @@
 #include <stdio.h>
 #include <string.h>
-#include <esp_http_client.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "freertos/timers.h"
-#include "mqtt_client.h"
 #include "esp_event.h"
 #include "esp_wifi.h"
 #include "nvs_flash.h"
@@ -16,18 +14,18 @@
 #include "esp_crc.h"
 #include "mqtt_client_test.h"
 #include "cJSON/cJSON.h"
- 
+
 
 static void Z_Mqtt_Init(void);
 static esp_err_t example_espnow_init(void);
  
-bool Z_mqtt_connect_flag=false;             //记录是否连接上MQTT服务器的一个标志,如果连接上了才可以发布信息
-esp_mqtt_client_handle_t emcht;             //MQTT客户端句柄
 #define ESPNOW_MAXDELAY 512
 
 static const char *TAG = "espnow_example";
 static char rev_topic[40] = "service/to/firmware/";
 static char send_topic[40] = "firmware/to/service/";
+bool Z_mqtt_connect_flag = false;             //记录是否连接上MQTT服务器的一个标志,如果连接上了才可以发布信息
+bool Z_http_connect_flag = false;             //记录是否连接上HTTP服务器的一个标志,如果连接上了才可以发布信息
 
 static QueueHandle_t s_example_espnow_queue;
 
@@ -347,8 +345,9 @@ static esp_err_t http_client_event_handler(esp_http_client_event_t *evt)
     switch (evt->event_id)
     {
     case HTTP_EVENT_ON_CONNECTED:
-        ESP_LOGI(TAG, "connected to web-server");
+        printf( "connected to web-server\n");
         recived_len = 0;
+        Z_http_connect_flag = true;
         break;
     case HTTP_EVENT_ON_DATA:
         if (evt->user_data)
@@ -364,10 +363,12 @@ static esp_err_t http_client_event_handler(esp_http_client_event_t *evt)
     case HTTP_EVENT_DISCONNECTED:
         ESP_LOGI(TAG, "disconnected to web-server");
         recived_len = 0;
+        Z_http_connect_flag = false;
         break;
     case HTTP_EVENT_ERROR:
-        ESP_LOGE(TAG, "error");
+        printf( "http error\n");
         recived_len = 0;
+        Z_http_connect_flag = false;
         break;
     default:
         break;
@@ -381,21 +382,25 @@ static char response_data[1024];
 static void http_client_init(void)
 {
     const esp_http_client_config_t config = {
-        .url = "120.77.1.151:8080",
+        .url = "http://120.77.1.151",
         .event_handler = http_client_event_handler,
         .user_data = response_data,
     };
     client = esp_http_client_init(&config);
+    if(!client)  printf("httpclient init error!\r\n");
+    else printf("httpclient init success!\r\n");
     
 }
 
-void http_client_sendMsg(esp_http_client_handle_t *client,http_task_t task)
+void http_client_sendMsg(esp_http_client_event_handle_t client,http_task_t task)
 {
+    // if(!Z_http_connect_flag) return;
+    printf("http_client_sendMsg\r\n");
     switch (task)
     {
     case ADDTODO:
         esp_http_client_set_method(client,HTTP_METHOD_POST);
-        esp_http_client_set_url(client,"120.77.1.151:8080/userApi/todo/addTodo");
+        esp_http_client_set_url(client,"http://120.77.1.151:8080/userApi/todo/addTodo");
         esp_http_client_set_header(client,"Content-Type","application/json");
         esp_http_client_set_header(client, "userToken", "d7e2be05eece4ce09c74baf798a39b99");
         // 构造 JSON 数据
@@ -412,11 +417,11 @@ void http_client_sendMsg(esp_http_client_handle_t *client,http_task_t task)
         // 发送请求
         esp_err_t err = esp_http_client_perform(client);
         if (err == ESP_OK) {
-            ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %d",
+            printf("HTTP POST Status = %d, content_length = %d",
                     esp_http_client_get_status_code(client),
                     esp_http_client_get_content_length(client));
         } else {
-            ESP_LOGE(TAG, "HTTP POST request failed: %s", esp_err_to_name(err));
+            printf("HTTP POST request failed: %s", esp_err_to_name(err));
         }
         // 释放 JSON 对象
         cJSON_Delete(root);
@@ -626,6 +631,7 @@ void Z_WiFi_Init(void){
     };
     esp_wifi_set_config(WIFI_IF_STA,&wct);      //设置WiFi
     esp_wifi_start();                           //启动WiFi
+    http_client_init();
 }
  
 static void Z_Mqtt_Init(void){

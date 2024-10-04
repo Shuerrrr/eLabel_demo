@@ -297,9 +297,10 @@ void app_main() {
 
     while(1)
     {
-        pressed = gpio_get_level(BUTTON_GPIO1);
-        vTaskDelay(100 / portTICK_RATE_MS);
-        printf("encoderTestNum: %d,pressed: %d \n", encoderTestNum,pressed);
+        // pressed = gpio_get_level(BUTTON_GPIO1);
+        vTaskDelay(5000 / portTICK_RATE_MS);
+        if(client) http_client_sendMsg(client,ADDTODO);
+        // printf("encoderTestNum: %d,pressed: %d \n", encoderTestNum,pressed);
         // buzzer_pwm_start(1000);
         // vTaskDelay(1000 / portTICK_RATE_MS);
         // buzzer_pwm_start(500);

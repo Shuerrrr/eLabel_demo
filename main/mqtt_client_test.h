@@ -6,6 +6,9 @@ extern "C" {
 #endif
 /* ESPNOW can work in both station and softap mode. It is configured in menuconfig. */
 #include "esp_now.h"
+#include <esp_http_client.h>
+#include "mqtt_client.h"
+ 
 #if CONFIG_ESPNOW_WIFI_MODE_STATION
 #define ESPNOW_WIFI_MODE WIFI_MODE_STA
 #define ESPNOW_WIFI_IF   ESP_IF_WIFI_STA
@@ -114,8 +117,11 @@ typedef enum {
 
 char mac_str[18];
 void Z_WiFi_Init(void);
-esp_http_client_handle_t client;
-void http_client_sendMsg(esp_http_client_handle_t *client,http_task_t task);
+
+esp_http_client_event_handle_t client;            //http客户端句柄
+esp_mqtt_client_handle_t emcht;             //MQTT客户端句柄
+
+void http_client_sendMsg(esp_http_client_event_handle_t client, http_task_t task);
 
 #ifdef __cplusplus
 } /*extern "C"*/
