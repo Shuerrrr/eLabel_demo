@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <esp_http_client.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -14,6 +15,7 @@
 #include "esp_mac.h"
 #include "esp_crc.h"
 #include "mqtt_client_test.h"
+#include "cJSON/cJSON.h"
  
 
 static void Z_Mqtt_Init(void);
@@ -24,6 +26,8 @@ esp_mqtt_client_handle_t emcht;             //MQTT客户端句柄
 #define ESPNOW_MAXDELAY 512
 
 static const char *TAG = "espnow_example";
+static char rev_topic[40] = "service/to/firmware/";
+static char send_topic[40] = "firmware/to/service/";
 
 static QueueHandle_t s_example_espnow_queue;
 
@@ -31,7 +35,75 @@ static uint8_t s_example_broadcast_mac[ESP_NOW_ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0
 static uint16_t s_example_espnow_seq[EXAMPLE_ESPNOW_DATA_MAX] = { 0, 0 };
 
 static void example_espnow_deinit(example_espnow_send_param_t *send_param);
- 
+
+bool mqttMessage_parse(char *data, MqttMessage *msg)
+{
+    cJSON *root = cJSON_Parse(data);
+    if (!root) {
+        ESP_LOGE(TAG, "JSON parse error");
+        return false;
+    }
+    cJSON *method = cJSON_GetObjectItem(root, "method");
+    if (method) {
+        strcpy(msg->method, method->valuestring);
+    } else {
+        ESP_LOGE(TAG, "Method not found");
+        return false;
+    }
+    cJSON *did = cJSON_GetObjectItem(root, "did");
+    if (did) {
+        msg->did = did->valueint;
+    } else {
+        ESP_LOGE(TAG, "Did not found");
+        return false;
+    }
+    cJSON *isReply = cJSON_GetObjectItem(root, "isReply");
+    if (isReply) {
+        msg->isReply = isReply->valueint;
+    } else {
+        ESP_LOGE(TAG, "isReply not found");
+        return false;
+    }
+    cJSON *msgId = cJSON_GetObjectItem(root, "msgId");
+    if (msgId) {
+        msg->msgId = msgId->valueint;
+    } else {
+        ESP_LOGE(TAG, "msgId not found");
+        return false;
+    }
+    
+    if(strcmp(msg->method, "outFocus") == 0)
+    {
+        cJSON *msg_focus = cJSON_GetObjectItem(root, "msg");
+        if (msg_focus) {
+            cJSON *id = cJSON_GetObjectItem(msg_focus, "id");
+            if (id) {
+                msg->msg_focus.id = id->valueint;
+            } else {
+                ESP_LOGE(TAG, "id not found");
+                return false;
+            }
+            cJSON *Focus = cJSON_GetObjectItem(msg_focus, "Focus");
+            if (Focus) {
+                msg->msg_focus.Focus = Focus->valueint;
+            } else {
+                ESP_LOGE(TAG, "Focus not found");
+                return false;
+            }
+        } else {
+            ESP_LOGE(TAG, "msg not found");
+            return false;
+        }
+    }
+    else
+    {
+        ESP_LOGE(TAG, "method not found");
+        return false;
+    }
+
+    cJSON_Delete(root);
+    return true;
+}
 
 /* Parse received ESPNOW data. */
 int example_espnow_data_parse(uint8_t *data, uint16_t data_len, uint8_t *state, uint16_t *seq, uint32_t *magic)
@@ -268,6 +340,95 @@ static void example_espnow_recv_cb(const uint8_t *mac_addr, const uint8_t *data,
     }
 }
 
+static int recived_len = 0;
+
+static esp_err_t http_client_event_handler(esp_http_client_event_t *evt)
+{
+    switch (evt->event_id)
+    {
+    case HTTP_EVENT_ON_CONNECTED:
+        ESP_LOGI(TAG, "connected to web-server");
+        recived_len = 0;
+        break;
+    case HTTP_EVENT_ON_DATA:
+        if (evt->user_data)
+        {
+            memcpy(evt->user_data + recived_len, evt->data, evt->data_len); // 将分片的每一片数据都复制到user_data
+            recived_len += evt->data_len;//累计偏移更新
+        }
+        break;
+    case HTTP_EVENT_ON_FINISH:
+        ESP_LOGI(TAG, "finished a request and response!");
+        recived_len = 0;
+        break;
+    case HTTP_EVENT_DISCONNECTED:
+        ESP_LOGI(TAG, "disconnected to web-server");
+        recived_len = 0;
+        break;
+    case HTTP_EVENT_ERROR:
+        ESP_LOGE(TAG, "error");
+        recived_len = 0;
+        break;
+    default:
+        break;
+    }
+
+    return ESP_OK;
+}
+
+static char response_data[1024];
+
+static void http_client_init(void)
+{
+    const esp_http_client_config_t config = {
+        .url = "120.77.1.151:8080",
+        .event_handler = http_client_event_handler,
+        .user_data = response_data,
+    };
+    client = esp_http_client_init(&config);
+    
+}
+
+void http_client_sendMsg(esp_http_client_handle_t *client,http_task_t task)
+{
+    switch (task)
+    {
+    case ADDTODO:
+        esp_http_client_set_method(client,HTTP_METHOD_POST);
+        esp_http_client_set_url(client,"120.77.1.151:8080/userApi/todo/addTodo");
+        esp_http_client_set_header(client,"Content-Type","application/json");
+        esp_http_client_set_header(client, "userToken", "d7e2be05eece4ce09c74baf798a39b99");
+        // 构造 JSON 数据
+        cJSON *root = cJSON_CreateObject();
+        cJSON_AddStringToObject(root, "title", "New TODO");
+        cJSON_AddStringToObject(root, "todoType", "TODO TASK1");
+
+        // 将 JSON 数据转换为字符串
+        const char *post_data = cJSON_Print(root);
+
+        // 将 JSON 数据设置为 HTTP 请求体
+        esp_http_client_set_post_field(client, post_data, strlen(post_data));
+
+        // 发送请求
+        esp_err_t err = esp_http_client_perform(client);
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %d",
+                    esp_http_client_get_status_code(client),
+                    esp_http_client_get_content_length(client));
+        } else {
+            ESP_LOGE(TAG, "HTTP POST request failed: %s", esp_err_to_name(err));
+        }
+        // 释放 JSON 对象
+        cJSON_Delete(root);
+        // 清理客户端
+        // esp_http_client_cleanup(client);
+        break;
+    default:
+        break;
+    }
+    
+}
+
 //WiFI事件处理函数
 static void  wifi_event_fun(void* handler_arg,esp_event_base_t event_base,int32_t event_id,void* event_data){
     printf("%s,%d\r\n",event_base,event_id);
@@ -296,6 +457,52 @@ static void  wifi_event_fun(void* handler_arg,esp_event_base_t event_base,int32_
         printf("lose connect wifi\r\n");
     }
 }
+
+static void solve_message(esp_mqtt_event_handle_t event)
+{
+    if(event->topic_len == 0 || event->data_len == 0) return;
+    // char *sname = (char*)(malloc(strlen(rev_topic_first)+strlen(mac_str)));
+    // sprintf(sname,"%s%s",rev_topic_first,mac_str);
+    // printf("sname:%s\r\n",sname);
+    // printf("event->topic:%.*s\r\n",event->topic_len,event->topic);
+    // char *
+    // if(strcmp(event->topic,sname) == 0)
+    // {
+        if(mqttMessage_parse(event->data, &Mqtt_msg))
+        {
+            if(strcmp(Mqtt_msg.method, "outFocus") == 0)
+            {
+                if(Mqtt_msg.isReply)//需要回复
+                {
+                    MqttMessage_reply_focus Mqtt_msg_reply;
+                    Mqtt_msg_reply.did = Mqtt_msg.did;
+                    Mqtt_msg_reply.isReply = 1;
+                    Mqtt_msg_reply.msgId = Mqtt_msg.msgId;
+                    strcpy(Mqtt_msg_reply.method, Mqtt_msg.method);
+                    strcpy(Mqtt_msg_reply.msg_focus.sn,mac_str);
+                    cJSON *json = cJSON_CreateObject();
+                    cJSON_AddNumberToObject(json, "did", Mqtt_msg_reply.did);
+                    cJSON_AddNumberToObject(json, "isReply", Mqtt_msg_reply.isReply);
+                    cJSON_AddNumberToObject(json, "msgId", Mqtt_msg_reply.msgId);
+                    cJSON_AddStringToObject(json, "method", Mqtt_msg_reply.method);
+                    cJSON *msg_focus = cJSON_CreateObject();
+                    cJSON_AddStringToObject(msg_focus, "sn", Mqtt_msg_reply.msg_focus.sn);
+                    cJSON_AddItemToObject(json, "msg", msg_focus);
+                    char *data = cJSON_Print(json);
+                    cJSON_Delete(json);
+                    // char *sname = (char*)(malloc(strlen(send_topic_first)+strlen(mac_str)));
+                    // sprintf(sname,"%s%s",send_topic_first,mac_str);
+                    esp_mqtt_client_publish(emcht,send_topic,data,0,1,0);
+                }
+            }
+        }
+    // }
+    // else
+    // {
+    //     printf("topic error\r\n");
+    //     return;
+    // }
+}
  
 //MQTT事件处理函数
 static void mqtt_event_fun(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id, void *event_data){
@@ -303,7 +510,9 @@ static void mqtt_event_fun(void *event_handler_arg, esp_event_base_t event_base,
  
     if(event_id==MQTT_EVENT_CONNECTED){                 //连接上MQTT服务器
         Z_mqtt_connect_flag=true;
-        esp_mqtt_client_subscribe(emcht,"Z_topic",1);    //订阅一个测试主题
+        // char *sname = (char*)(malloc(strlen(rev_topic_first)+strlen(mac_str)));
+        // sprintf(sname,"%s%s",rev_topic_first,mac_str);
+        esp_mqtt_client_subscribe(emcht,rev_topic,1);    //订阅一个测试主题
         printf("success connect mqtt\r\n");
     }else if(event_id==MQTT_EVENT_DISCONNECTED){        //断开MQTT服务器连接
         Z_mqtt_connect_flag=false;
@@ -311,6 +520,8 @@ static void mqtt_event_fun(void *event_handler_arg, esp_event_base_t event_base,
     }else if(event_id==MQTT_EVENT_DATA){                //收到订阅信息
         esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t )event_data;   //强转获取存放订阅信息的参数
         printf("receive data : %.*s from %.*s\r\n",event->data_len,event->data,event->topic_len,event->topic);
+        solve_message(event);
+        printf("solve message after\r\n");
     }
 }
 
@@ -378,7 +589,7 @@ static esp_err_t example_espnow_init(void)
     memcpy(send_param->dest_mac, s_example_broadcast_mac, ESP_NOW_ETH_ALEN);
     example_espnow_data_prepare(send_param);
 
-    xTaskCreate(example_espnow_task, "example_espnow_task", 2048, send_param, 4, NULL);
+    xTaskCreate(example_espnow_task, "example_espnow_task", 4096, send_param, 0, NULL);
 
     return ESP_OK;
 }
@@ -398,6 +609,14 @@ void Z_WiFi_Init(void){
     wifi_init_config_t wict = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&wict);                       //初始化WiFI
     esp_wifi_set_mode(WIFI_MODE_STA);           //设为STA模式
+
+    uint8_t mac[6];
+    esp_efuse_mac_get_default(mac);
+    snprintf(mac_str, sizeof(mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    printf("MAC: %s\n", mac_str);
+    strcat(rev_topic,mac_str);
+    strcat(send_topic,mac_str);
     wifi_config_t wct = {
         .sta = {
             .ssid="“KUMIKO”的 iPhone",
@@ -411,10 +630,10 @@ void Z_WiFi_Init(void){
  
 static void Z_Mqtt_Init(void){
     esp_mqtt_client_config_t emcct = {
-        .uri="mqtt://tec6fece.ala.dedicated.aliyun.emqxcloud.cn",  //MQTT服务器的uri
+        .uri="mqtt://120.77.1.151",  //MQTT服务器的uri
         .port=1883,                   //MQTT服务器的端口
-        .username="shu123",
-        .password="shu123"
+        // .username="shu123",
+        // .password="shu123"
     };
     emcht = esp_mqtt_client_init(&emcct);           //初始化MQTT客户端获取句柄
     if(!emcht)  printf("mqtt init error!\r\n");

@@ -76,7 +76,46 @@ typedef struct {
     uint8_t dest_mac[ESP_NOW_ETH_ALEN];   //MAC address of destination device.
 } example_espnow_send_param_t;
 
+typedef struct {
+    uint8_t id;
+    bool Focus;
+} MqttMsg_focus_rec;
+
+typedef struct {
+    char sn[18];
+} MqttMsg_focus_send;
+
+
+typedef struct {
+    int did;
+    int isReply;
+    int msgId;
+    char method[20];
+
+    MqttMsg_focus_rec msg_focus;
+} MqttMessage;
+
+typedef struct {
+    int did;
+    int isReply;
+    int msgId;
+    char method[20];
+
+    MqttMsg_focus_send msg_focus;
+} MqttMessage_reply_focus;
+
+
+MqttMessage Mqtt_msg;
+
+typedef enum {
+    ENTER_FOCUS,
+    ADDTODO,
+} http_task_t;
+
+char mac_str[18];
 void Z_WiFi_Init(void);
+esp_http_client_handle_t client;
+void http_client_sendMsg(esp_http_client_handle_t *client,http_task_t task);
 
 #ifdef __cplusplus
 } /*extern "C"*/

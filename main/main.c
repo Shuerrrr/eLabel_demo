@@ -27,6 +27,8 @@
 #include "sdmmc_cmd.h"
 #include "mqtt_client_test.h"
 
+#include "cJSON/cJSON.h"
+
 /* Littlevgl specific */
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
 #include "lvgl.h"
@@ -203,12 +205,10 @@ static void IRAM_ATTR gpio_isr_handler(void* arg)
             icnt = 0;
         }
     }
-    // else if(gpio_num == BUTTON_GPIO1)
-    // {
-    //     {
-    //         pressed = 1;
-    //     }
-    // }
+    else if(gpio_num == BUTTON_GPIO1)
+    {
+        lv_event_send(lv_scr_act(), LV_EVENT_CLICKED, NULL);  // Trigger the click event
+    }
     // xQueueSendFromISR(gpioEventQueue, &gpio_num, NULL);
 }
 
@@ -232,16 +232,16 @@ static void encoder_gpio_init(void)
     gpio_config(&io_conf);
     
     //按键中断
-    io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.intr_type = GPIO_INTR_NEGEDGE;
     io_conf.mode = GPIO_MODE_INPUT;
     io_conf.pin_bit_mask = (1ULL<<BUTTON_GPIO1);
-    io_conf.pull_down_en = GPIO_PULLDOWN_ENABLE;
-    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
     gpio_config(&io_conf);
 
     gpio_install_isr_service(0);
     gpio_isr_handler_add(EC56_GPIO_A, gpio_isr_handler, (void*)EC56_GPIO_A);
-    // gpio_isr_handler_add(BUTTON_GPIO1, gpio_isr_handler, (void*)BUTTON_GPIO1);
+    gpio_isr_handler_add(BUTTON_GPIO1, gpio_isr_handler, (void*)BUTTON_GPIO1);
     // gpio_isr_handler_add(EC56_GPIO_B, gpio_isr_handler, (void*)EC56_GPIO_B);
 }
 
@@ -292,14 +292,14 @@ void app_main() {
     buzzer_pwm_init();
 
     // sdmmc_card_t *card;
-    SDcard_init();
+    // SDcard_init();
     // SDcard_deinit(card);
 
     while(1)
     {
         pressed = gpio_get_level(BUTTON_GPIO1);
         vTaskDelay(100 / portTICK_RATE_MS);
-        // printf("encoderTestNum: %d,pressed: %d \n", encoderTestNum,pressed);
+        printf("encoderTestNum: %d,pressed: %d \n", encoderTestNum,pressed);
         // buzzer_pwm_start(1000);
         // vTaskDelay(1000 / portTICK_RATE_MS);
         // buzzer_pwm_start(500);
