@@ -223,7 +223,7 @@ static void example_espnow_task(void *pvParameter)
                             vTaskDelete(NULL);
                         }
                         memset(peer, 0, sizeof(esp_now_peer_info_t));
-                        peer->channel = CONFIG_ESPNOW_CHANNEL;
+                        peer->channel = 0;
                         peer->ifidx = ESPNOW_WIFI_IF;
                         peer->encrypt = true;
                         memcpy(peer->lmk, CONFIG_ESPNOW_LMK, ESP_NOW_KEY_LEN);
@@ -434,6 +434,7 @@ void http_client_sendMsg(esp_http_client_event_handle_t client,http_task_t task)
     
 }
 
+
 //WiFI事件处理函数
 static void  wifi_event_fun(void* handler_arg,esp_event_base_t event_base,int32_t event_id,void* event_data){
     printf("%s,%d\r\n",event_base,event_id);
@@ -447,8 +448,11 @@ static void  wifi_event_fun(void* handler_arg,esp_event_base_t event_base,int32_
         example_espnow_init();                               
         printf("start connect wifi,espnow\r\n");                   
     }else if(event_id==WIFI_EVENT_STA_CONNECTED){       //连接上WiFI之后
+        wifi_event_sta_connected_t* event_info = (wifi_event_sta_connected_t*) event_data;  // 获取连接信息
         Z_Mqtt_Init();                                  //开始连接MQTT服务器
         printf("success connect wifi\r\n");
+        printf("Wi-Fi connected, channel: %d\n", event_info->channel);
+        
     }else if(event_id == WIFI_EVENT_STA_DISCONNECTED){   // WiFi 断开
         wifi_event_sta_disconnected_t* disconnected = (wifi_event_sta_disconnected_t*) event_data;
         printf("Disconnected reason: %d\n", disconnected->reason); // 打印断开原因
@@ -560,7 +564,7 @@ static esp_err_t example_espnow_init(void)
         return ESP_FAIL;
     }
     memset(peer, 0, sizeof(esp_now_peer_info_t));
-    peer->channel = CONFIG_ESPNOW_CHANNEL;
+    peer->channel = 0;
     peer->ifidx = ESPNOW_WIFI_IF;
     peer->encrypt = false;
     memcpy(peer->peer_addr, s_example_broadcast_mac, ESP_NOW_ETH_ALEN);
@@ -614,7 +618,6 @@ void Z_WiFi_Init(void){
     wifi_init_config_t wict = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&wict);                       //初始化WiFI
     esp_wifi_set_mode(WIFI_MODE_STA);           //设为STA模式
-
     uint8_t mac[6];
     esp_efuse_mac_get_default(mac);
     snprintf(mac_str, sizeof(mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
