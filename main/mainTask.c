@@ -244,6 +244,10 @@ void Execute()
 
             if(tasklen)//旋钮选择任务
             {
+                if(EncoderValue < 0)
+                {
+                    EncoderValue = tasklen - 1;
+                }
                 chosenTaskNum = (EncoderValue/ENCODER_K) % tasklen;
                 if(chosenTaskNum != lastChosenTaskNum)
                 {
@@ -351,6 +355,8 @@ void Execute()
                     if(!TimeCountdown)
                     {
                         delete_task(&task_list,chosenTaskNum);//删除当前任务
+                        tasks2str(task_list);
+                        lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
                         lv_event_send(lv_scr_act(), LV_EVENT_CLICKED, NULL);
                         ChangeState(Preparing);
                         continue;
