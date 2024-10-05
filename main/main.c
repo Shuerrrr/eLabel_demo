@@ -26,6 +26,7 @@
 #include "esp_vfs_fat.h"
 #include "sdmmc_cmd.h"
 #include "mqtt_client_test.h"
+#include "main.h"
 
 #include "cJSON/cJSON.h"
 
@@ -197,17 +198,21 @@ static void IRAM_ATTR gpio_isr_handler(void* arg)
             if(gpio_get_level(EC56_GPIO_B) == 0 && flag == 1)
             {
                 encoderTestNum++;
+                EncoderValue++;
             }
             if(gpio_get_level(EC56_GPIO_B) == 1 && flag == 0)
             {
                 encoderTestNum--;
+                EncoderValue--;
             }
             icnt = 0;
         }
     }
     else if(gpio_num == BUTTON_GPIO1)
     {
-        lv_event_send(lv_scr_act(), LV_EVENT_CLICKED, NULL);  // Trigger the click event
+        // lv_event_send(lv_scr_act(), LV_EVENT_CLICKED, NULL);  // Trigger the click event
+        EncoderValue = 0;
+        lastEncoderValue = 0;
     }
     // xQueueSendFromISR(gpioEventQueue, &gpio_num, NULL);
 }
@@ -282,7 +287,7 @@ void app_main() {
      * NOTE: When not using Wi-Fi nor Bluetooth you can pin the guiTask to core 0 */
 
     printf("Starting WIFI Test!\n");
-    Z_WiFi_Init();
+    // Z_WiFi_Init();
 
     printf("Starting LVGL example\n");
     xTaskCreatePinnedToCore(guiTask, "gui", 4096*2, NULL, 0, NULL, 1);
@@ -291,16 +296,28 @@ void app_main() {
     encoder_gpio_init();
     buzzer_pwm_init();
 
+    needFlashEpaper = true;
+
+    vTaskDelay(1000 / portTICK_RATE_MS);
+    stateInit();
+    add_task(&task_list,"fuckyou");
+    add_task(&task_list,"fuckme");
+    add_task(&task_list,"fuckeveryone");
+    tasks2str(task_list);
+    lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
+
+    xTaskCreate(Execute, "eLabelTask", 2048, NULL, 1, NULL);
+
     // sdmmc_card_t *card;
     // SDcard_init();
     // SDcard_deinit(card);
 
     while(1)
     {
-        // pressed = gpio_get_level(BUTTON_GPIO1);
-        vTaskDelay(5000 / portTICK_RATE_MS);
-        if(client) http_client_sendMsg(client,ADDTODO);
-        // printf("encoderTestNum: %d,pressed: %d \n", encoderTestNum,pressed);
+        pressed = gpio_get_level(BUTTON_GPIO1);
+        vTaskDelay(1000 / portTICK_RATE_MS);
+        // if(client) http_client_sendMsg(client,ADDTODO);
+        printf("encodervalue: %d,pressed: %d \n", EncoderValue,pressed);
         // buzzer_pwm_start(1000);
         // vTaskDelay(1000 / portTICK_RATE_MS);
         // buzzer_pwm_start(500);
