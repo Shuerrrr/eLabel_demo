@@ -399,6 +399,7 @@ void http_client_sendMsg(esp_http_client_event_handle_t client,http_task_t task)
     switch (task)
     {
     case ADDTODO:
+    {
         esp_http_client_set_method(client,HTTP_METHOD_POST);
         esp_http_client_set_url(client,"http://120.77.1.151:8080/userApi/todo/addTodo");
         esp_http_client_set_header(client,"Content-Type","application/json");
@@ -428,6 +429,78 @@ void http_client_sendMsg(esp_http_client_event_handle_t client,http_task_t task)
         // 清理客户端
         // esp_http_client_cleanup(client);
         break;
+    }
+    case FINDLATESTVERSION:
+    {
+        esp_http_client_set_method(client,HTTP_METHOD_POST);
+        esp_http_client_set_url(client,"http://120.77.1.151:8080/userApi/deviceFirmware/getDeviceUpToDateFirmwareVersion");
+        esp_http_client_set_header(client,"Content-Type","multipart/form-data");
+        esp_http_client_set_header(client, "userToken", "d7e2be05eece4ce09c74baf798a39b99");
+        // 构造 JSON 数据
+        cJSON *root = cJSON_CreateObject();
+        cJSON_AddStringToObject(root, "version", "1");
+        // 将 JSON 数据转换为字符串
+        const char *post_data = cJSON_Print(root);
+
+        // 将 JSON 数据设置为 HTTP 请求体
+        esp_http_client_set_post_field(client, post_data, strlen(post_data));
+
+        // 发送请求
+        esp_err_t err = esp_http_client_perform(client);
+        if (err == ESP_OK) {
+            printf("HTTP POST Status = %d, content_length = %d\n",
+                    esp_http_client_get_status_code(client),
+                    esp_http_client_get_content_length(client));
+                    
+            // 获取响应内容
+        char response_buffer[1024];  // 假设响应不会超过 1024 字节
+        int content_length = esp_http_client_get_content_length(client);
+        printf("content_length = %d,response_buffer = %d\n",content_length,sizeof(response_buffer));
+        if (content_length <= (int)sizeof(response_buffer)) {
+            int bytes_read = esp_http_client_read(client, response_buffer, sizeof(response_buffer) - 1);
+            if (bytes_read >= 0) {
+                response_buffer[bytes_read] = '\0';  // 确保以 NULL 结尾
+                printf("Response: %s\n", response_buffer);
+
+                // 解析响应 JSON
+                cJSON *response_json = cJSON_Parse(response_buffer);
+                if (response_json != NULL) {
+                    cJSON *msg = cJSON_GetObjectItem(response_json, "msg");
+                    cJSON *code = cJSON_GetObjectItem(response_json, "code");
+                    cJSON *data = cJSON_GetObjectItem(response_json, "data");
+                    if (msg && code && data) {
+                        printf("Message: %s, Code: %d\n", msg->valuestring, code->valueint);
+
+                        cJSON *data_content = cJSON_GetObjectItem(data, "data");
+                        if (data_content) {
+                            cJSON *version = cJSON_GetObjectItem(data_content, "version");
+                            cJSON *firmwareUrl = cJSON_GetObjectItem(data_content, "firmwareUrl");
+                            if (version && firmwareUrl) {
+                                printf("Latest Version: %s, Firmware URL: %s\n", version->valuestring, firmwareUrl->valuestring);
+                            }
+                        }
+                    }
+                    cJSON_Delete(response_json);  // 释放 JSON 对象
+                } 
+                else {
+                    printf("Failed to parse JSON response\n");
+                }
+
+            } else {
+            printf("Failed to read response\n");
+            }
+        } else {
+            printf("Response content too large to handle\n");
+        }
+        } else {
+            printf("HTTP POST request failed: %s", esp_err_to_name(err));
+        }
+        // 释放 JSON 对象
+        cJSON_Delete(root);
+        // 清理客户端
+        // esp_http_client_cleanup(client);
+        break;
+    }
     default:
         break;
     }

@@ -113,6 +113,7 @@ MqttMessage Mqtt_msg;
 typedef enum {
     ENTER_FOCUS,
     ADDTODO,
+    FINDLATESTVERSION,
 } http_task_t;
 
 char mac_str[18];

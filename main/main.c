@@ -287,10 +287,11 @@ void app_main() {
      * NOTE: When not using Wi-Fi nor Bluetooth you can pin the guiTask to core 0 */
 
     printf("Starting WIFI Test!\n");
-    // Z_WiFi_Init();
+    Z_WiFi_Init();
 
     printf("Starting LVGL example\n");
-    xTaskCreatePinnedToCore(guiTask, "gui", 4096*2, NULL, 0, NULL, 1);
+
+    // xTaskCreatePinnedToCore(guiTask, "gui", 4096*2, NULL, 0, NULL, 1);
 
     gpioEventQueue = xQueueCreate(10, sizeof(uint32_t));
     encoder_gpio_init();
@@ -298,15 +299,15 @@ void app_main() {
 
     needFlashEpaper = true;
 
-    vTaskDelay(1000 / portTICK_RATE_MS);
-    stateInit();
-    add_task(&task_list,"fuckyou");
-    add_task(&task_list,"fuckme");
-    add_task(&task_list,"fuckeveryone");
-    tasks2str(task_list);
-    lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
+    // vTaskDelay(1000 / portTICK_RATE_MS);
+    // stateInit();
+    // add_task(&task_list,"fuckyou");
+    // add_task(&task_list,"fuckme");
+    // add_task(&task_list,"fuckeveryone");
+    // tasks2str(task_list);
+    // lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
 
-    xTaskCreate(Execute, "eLabelTask", 2048, NULL, 1, NULL);
+    // xTaskCreate(Execute, "eLabelTask", 2048, NULL, 1, NULL);
 
     // sdmmc_card_t *card;
     // SDcard_init();
@@ -315,9 +316,9 @@ void app_main() {
     while(1)
     {
         pressed = gpio_get_level(BUTTON_GPIO1);
-        vTaskDelay(1000 / portTICK_RATE_MS);
-        // if(client) http_client_sendMsg(client,ADDTODO);
-        printf("encodervalue: %d,pressed: %d \n", EncoderValue,pressed);
+        vTaskDelay(5000 / portTICK_RATE_MS);
+        if(client) http_client_sendMsg(client,FINDLATESTVERSION);
+        // printf("encodervalue: %d,pressed: %d \n", EncoderValue,pressed);
         // buzzer_pwm_start(1000);
         // vTaskDelay(1000 / portTICK_RATE_MS);
         // buzzer_pwm_start(500);
