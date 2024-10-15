@@ -135,7 +135,13 @@ int example_espnow_data_parse(uint8_t *data, uint16_t data_len, uint8_t *state, 
         espnow_recv_buf.msg_type = buf->msg_type;
         espnow_recv_buf.chosenTaskId = buf->chosenTaskId;
         espnow_recv_buf.TimeCountdown = buf->TimeCountdown;
-        espnow_recv_buf.payload = buf->payload;
+        uint8_t i = 0;
+        while(buf->payload[i] != 0)
+        {
+            espnow_recv_buf.payload[i] = buf->payload[i];
+            i++;
+        }
+        espnow_recv_buf.payload[i] = 0;
         //打印所有buf成员变量
         printf("elabel_state = %d\n",espnow_recv_buf.elabel_state);
         printf("task_method = %d\n",espnow_recv_buf.task_method);
@@ -143,6 +149,7 @@ int example_espnow_data_parse(uint8_t *data, uint16_t data_len, uint8_t *state, 
         printf("msg_type = %d\n",espnow_recv_buf.msg_type);
         printf("chosenTaskId = %d\n",espnow_recv_buf.chosenTaskId);
         printf("TimeCountdown = %d\n",espnow_recv_buf.TimeCountdown);
+        printf("payload = %s\n",(char*)espnow_recv_buf.payload);
         return buf->type;
     }
 
@@ -687,14 +694,14 @@ static esp_err_t example_espnow_init(void)
     free(peer);
 
     /* Initialize sending parameters. */
-    send_param = malloc(sizeof(example_espnow_send_param_t))+50;
+    send_param = malloc(sizeof(example_espnow_send_param_t));
     if (send_param == NULL) {
         ESP_LOGE(TAG, "Malloc send parameter fail");
         vSemaphoreDelete(s_example_espnow_queue);
         esp_now_deinit();
         return ESP_FAIL;
     }
-    memset(send_param, 0, sizeof(example_espnow_send_param_t)+50);
+    memset(send_param, 0, sizeof(example_espnow_send_param_t));
     send_param->unicast = false;
     send_param->broadcast = true;
     send_param->state = 0;

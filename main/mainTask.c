@@ -47,6 +47,7 @@ TaskNode* create_task(const char* task_content) {
         printf("内存分配失败\n");
         return NULL;
     }
+    printf("create_task before dup: %s\n",task_content);
     new_task->task = strdup(task_content);  // 复制任务内容
     new_task->next = NULL;
     return new_task;
@@ -535,6 +536,7 @@ void sync_recv_update()
     case 2:
         if(espnow_recv_buf.task_method == 2)
         {
+            printf("before addTask:%s\n",(char*)espnow_recv_buf.payload);
             add_task(&task_list, (char*)espnow_recv_buf.payload);
             tasks2str(task_list);
             lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);

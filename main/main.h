@@ -74,7 +74,7 @@ typedef struct{
     uint8_t msg_type;                    //0:啥都没变，1：elabel_State变了，2：task_method要执行了,3:state和method都要执行了
     uint8_t chosenTaskId;                 //state = 3调用进入focus所选的任务
     uint32_t TimeCountdown;               //state = 3调用倒计时时间
-    uint8_t *payload;
+    uint8_t payload[50];
 } espnow_send_param_buf;
 
 espnow_send_param_buf espnow_send_buf;
