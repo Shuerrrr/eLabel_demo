@@ -687,14 +687,14 @@ static esp_err_t example_espnow_init(void)
     free(peer);
 
     /* Initialize sending parameters. */
-    send_param = malloc(sizeof(example_espnow_send_param_t));
+    send_param = malloc(sizeof(example_espnow_send_param_t))+50;
     if (send_param == NULL) {
         ESP_LOGE(TAG, "Malloc send parameter fail");
         vSemaphoreDelete(s_example_espnow_queue);
         esp_now_deinit();
         return ESP_FAIL;
     }
-    memset(send_param, 0, sizeof(example_espnow_send_param_t));
+    memset(send_param, 0, sizeof(example_espnow_send_param_t)+50);
     send_param->unicast = false;
     send_param->broadcast = true;
     send_param->state = 0;
@@ -702,7 +702,7 @@ static esp_err_t example_espnow_init(void)
     send_param->count = 0;//CONFIG_ESPNOW_SEND_COUNT;
     send_param->delay = 1000;//CONFIG_ESPNOW_SEND_DELAY;
     send_param->len = sizeof(example_espnow_data_t);//CONFIG_ESPNOW_SEND_LEN;
-    send_param->buffer = malloc(sizeof(example_espnow_data_t));
+    send_param->buffer = malloc(sizeof(example_espnow_data_t)+50);
     example_espnow_data_t *tempbuf = send_param->buffer; 
     tempbuf->elabel_state = 0;
     tempbuf->task_method = 0;

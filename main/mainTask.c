@@ -459,14 +459,20 @@ void sync_to_slaves(const char *task_content)
             break;
         }
         case 2:
-            send_param->len = strlen(task_content) + sizeof(example_espnow_data_t);
-            example_espnow_data_t *buf11 = (example_espnow_data_t*)send_param->buffer;
-            strcpy((char*)(buf11->payload), task_content);
+            if(task_content != NULL)
+            {
+                send_param->len = strlen(task_content) + sizeof(example_espnow_data_t);
+                example_espnow_data_t *buf11 = (example_espnow_data_t*)send_param->buffer;
+                strcpy((char*)(buf11->payload), task_content);
+            }
             break;
         case 3:
-            send_param->len = strlen(task_content) + sizeof(example_espnow_data_t);
-            example_espnow_data_t *buf22 = (example_espnow_data_t*)send_param->buffer;
-            strcpy((char*)(buf22->payload), task_content);
+            if(task_content != NULL)
+            {
+                send_param->len = strlen(task_content) + 1 + sizeof(example_espnow_data_t);
+                example_espnow_data_t *buf22 = (example_espnow_data_t*)send_param->buffer;
+                strcpy((char*)(buf22->payload), task_content);
+            }
             break;
         default:
             send_param->len = sizeof(example_espnow_data_t);
@@ -530,10 +536,14 @@ void sync_recv_update()
         if(espnow_recv_buf.task_method == 2)
         {
             add_task(&task_list, (char*)espnow_recv_buf.payload);
+            tasks2str(task_list);
+            lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
         }
         else if(espnow_recv_buf.task_method == 3)
         {
             delete_task(&task_list, espnow_recv_buf.changeTaskId);
+            tasks2str(task_list);
+            lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
         }
         else if(espnow_recv_buf.task_method == 1)
         {
@@ -543,16 +553,22 @@ void sync_recv_update()
                 free(task);
                 task = strdup((char*)espnow_recv_buf.payload);
             }
+            tasks2str(task_list);
+            lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
         }
         break;
     case 3:
         if(espnow_recv_buf.task_method == 2)
         {
             add_task(&task_list, (char*)espnow_recv_buf.payload);
+            tasks2str(task_list);
+            lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
         }
         else if(espnow_recv_buf.task_method == 3)
         {
             delete_task(&task_list, espnow_recv_buf.changeTaskId);
+            tasks2str(task_list);
+            lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
         }
         else if(espnow_recv_buf.task_method == 1)
         {
@@ -562,6 +578,8 @@ void sync_recv_update()
                 free(task);
                 task = strdup((char*)espnow_recv_buf.payload);
             }
+            tasks2str(task_list);
+            lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
         }
 
 
