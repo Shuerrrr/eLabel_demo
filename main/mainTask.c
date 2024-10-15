@@ -29,7 +29,18 @@
 
 #include "lvgl_helpers.h"
 
+
+uint8_t s_example_broadcast_mac[ESP_NOW_ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+uint8_t slave_num = 0;
+uint8_t slave_mac[MAX_SLAVES][ESP_NOW_ETH_ALEN] = { 0 };
+
 // 创建新任务
+void espnow_send_buf_reset(espnow_send_param_buf* buff)
+{
+    buff->msg_type = 0;
+    buff->task_method = 0;
+}
+
 TaskNode* create_task(const char* task_content) {
     TaskNode *new_task = (TaskNode *)malloc(sizeof(TaskNode));
     if (new_task == NULL) {
@@ -219,6 +230,7 @@ void Execute()
 {
     while(1)
     {
+        sync_recv_update();
         switch (label_state)
         {
         case Preparing:
@@ -238,6 +250,12 @@ void Execute()
                 free(sname);
                 
                 ChangeState(Operating);
+                espnow_send_buf.msg_type = 1;
+                espnow_send_buf.elabel_state = 2;
+                espnow_send_buf.chosenTaskId = chosenTaskNum;
+                
+                sync_to_slaves(NULL);
+
                 printf("change into Operating\n");
                 continue;
             }
@@ -254,7 +272,7 @@ void Execute()
                     needFlashEpaper = true;
                 }
                 lastChosenTaskNum = chosenTaskNum;
-                printf("chosenTaskNum: %d\n",chosenTaskNum);
+                // printf("chosenTaskNum: %d\n",chosenTaskNum);
             }
 
             if(needFlashEpaper)
@@ -282,6 +300,10 @@ void Execute()
                     {
                         lv_event_send(lv_scr_act(), LV_EVENT_CLICKED, NULL);
                         ChangeState(Preparing);
+
+                        espnow_send_buf.msg_type = 1;
+                        espnow_send_buf.elabel_state = 1;
+                        sync_to_slaves(NULL);
                         continue;
                     }
                     else if(EncoderValue/ENCODER_K2 > 0)
@@ -293,6 +315,10 @@ void Execute()
                         lv_label_set_text(ui_Label7, sname);
                         free(sname);
                         ChangeState(Focus);
+
+                        espnow_send_buf.msg_type = 1;
+                        espnow_send_buf.elabel_state = 3;
+                        sync_to_slaves(NULL);
                         continue;
                     }
                 }
@@ -316,6 +342,10 @@ void Execute()
                 
                 if(TimeCountdown != LastTimeCountdown) needFlashEpaper = true;
                 LastTimeCountdown = TimeCountdown;
+            }
+            else
+            {
+                printf("operating");
             }
             // else显示操作中 
             
@@ -348,6 +378,10 @@ void Execute()
                 {
                     lv_event_send(lv_scr_act(), LV_EVENT_CLICKED, NULL);
                     ChangeState(Preparing);
+
+                    espnow_send_buf.msg_type = 1;
+                    espnow_send_buf.elabel_state = 1;
+                    sync_to_slaves(NULL);
                     continue;
                 }
                 else if(TimeTick - _button_tick_buf <= 200 && TimeTick - _button_tick_buf > 10) //10*10ms,短按
@@ -359,6 +393,13 @@ void Execute()
                         lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
                         lv_event_send(lv_scr_act(), LV_EVENT_CLICKED, NULL);
                         ChangeState(Preparing);
+
+                        espnow_send_buf.msg_type = 3;
+                        espnow_send_buf.elabel_state = 1;
+                        espnow_send_buf.task_method = 3;
+                        espnow_send_buf.chosenTaskId = chosenTaskNum;
+                        sync_to_slaves(NULL);
+
                         continue;
                     }
                 }
@@ -399,3 +440,161 @@ void Execute()
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
+
+void sync_to_slaves(const char *task_content)
+{
+    if(send_param->state == 0) return;
+    send_param->msg_type = espnow_send_buf.msg_type;
+    send_param->task_method = espnow_send_buf.task_method;
+    send_param->elabel_state = espnow_send_buf.elabel_state;
+    send_param->chosenTaskId = espnow_send_buf.chosenTaskId;
+    send_param->TimeCountdown = espnow_send_buf.TimeCountdown;
+    send_param->changeTaskId = espnow_send_buf.changeTaskId;
+
+    switch(espnow_send_buf.msg_type)
+    {
+        case 1:
+        {
+            send_param->len = sizeof(example_espnow_data_t);
+            break;
+        }
+        case 2:
+            send_param->len = strlen(task_content) + sizeof(example_espnow_data_t);
+            example_espnow_data_t *buf11 = (example_espnow_data_t*)send_param->buffer;
+            strcpy((char*)(buf11->payload), task_content);
+            break;
+        case 3:
+            send_param->len = strlen(task_content) + sizeof(example_espnow_data_t);
+            example_espnow_data_t *buf22 = (example_espnow_data_t*)send_param->buffer;
+            strcpy((char*)(buf22->payload), task_content);
+            break;
+        default:
+            send_param->len = sizeof(example_espnow_data_t);
+            break;
+    }
+    for(int i = 0; i < slave_num; i++)
+    {
+        uint8_t *mac_addr = slave_mac[i];
+        example_espnow_event_t evt;
+        example_espnow_event_send_cb_t *send_cb = &evt.info.send_cb;
+
+        if (mac_addr == NULL) {
+            // ESP_LOGE(TAG, "Send cb arg error");
+            return;
+        }
+
+        evt.id = EXAMPLE_ESPNOW_SEND_CB;
+        memcpy(send_cb->mac_addr, mac_addr, ESP_NOW_ETH_ALEN);
+        // send_cb->status = status;
+        if (xQueueSend(s_example_espnow_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
+            printf("Send send queue fail\n");
+        }
+    }
+    espnow_send_buf_reset(&espnow_send_buf);
+}
+
+void sync_recv_update()
+{
+    switch (espnow_recv_buf.msg_type)
+    {
+    case 1:
+        if(espnow_recv_buf.elabel_state == 1)
+        {
+            _ui_screen_change(&ui_Screen1, LV_SCR_LOAD_ANIM_NONE, 500, 500, &ui_Screen3_screen_init);
+            ChangeState(Preparing);
+        }
+        else if(espnow_recv_buf.elabel_state == 2)
+        {
+            OperatingLabelFlag = false;
+            chosenTaskNum = espnow_recv_buf.chosenTaskId;
+            printf("change into Operating\n");
+            ChangeState(Operating);
+        }
+        else if(espnow_recv_buf.elabel_state == 3)
+        {
+            TimeCountdownOffset = TimeCountdown = espnow_recv_buf.TimeCountdown;
+            chosenTaskNum = espnow_recv_buf.chosenTaskId;
+
+            _ui_screen_change(&ui_Screen3, LV_SCR_LOAD_ANIM_NONE, 500, 500, &ui_Screen3_screen_init);
+            char* taskname = find_task_by_position(task_list,chosenTaskNum);
+            char *sname = (char*)(malloc(strlen(taskname)+strlen("\n\n\n\nTimeCountdown:")));
+            sprintf(sname,"%s%s",taskname,"\n\n\n\nTimeCountdown:");
+            lv_label_set_text(ui_Label7, sname);
+            free(sname);
+
+            ChangeState(Focus);
+        }
+        break;
+    case 2:
+        if(espnow_recv_buf.task_method == 2)
+        {
+            add_task(&task_list, (char*)espnow_recv_buf.payload);
+        }
+        else if(espnow_recv_buf.task_method == 3)
+        {
+            delete_task(&task_list, espnow_recv_buf.changeTaskId);
+        }
+        else if(espnow_recv_buf.task_method == 1)
+        {
+            char *task = find_task_by_position(task_list, espnow_recv_buf.changeTaskId);
+            if(task != NULL)
+            {
+                free(task);
+                task = strdup((char*)espnow_recv_buf.payload);
+            }
+        }
+        break;
+    case 3:
+        if(espnow_recv_buf.task_method == 2)
+        {
+            add_task(&task_list, (char*)espnow_recv_buf.payload);
+        }
+        else if(espnow_recv_buf.task_method == 3)
+        {
+            delete_task(&task_list, espnow_recv_buf.changeTaskId);
+        }
+        else if(espnow_recv_buf.task_method == 1)
+        {
+            char *task = find_task_by_position(task_list, espnow_recv_buf.changeTaskId);
+            if(task != NULL)
+            {
+                free(task);
+                task = strdup((char*)espnow_recv_buf.payload);
+            }
+        }
+
+
+        if(espnow_recv_buf.elabel_state == 1)
+        {
+            _ui_screen_change(&ui_Screen1, LV_SCR_LOAD_ANIM_NONE, 500, 500, &ui_Screen3_screen_init);
+            ChangeState(Preparing);
+        }
+        else if(espnow_recv_buf.elabel_state == 2)
+        {
+            OperatingLabelFlag = false;
+            chosenTaskNum = espnow_recv_buf.chosenTaskId;
+            printf("change into Operating\n");
+            ChangeState(Operating);
+        }
+        else if(espnow_recv_buf.elabel_state == 3)
+        {
+            TimeCountdownOffset = TimeCountdown = espnow_recv_buf.TimeCountdown;
+            chosenTaskNum = espnow_recv_buf.chosenTaskId;
+
+            _ui_screen_change(&ui_Screen3, LV_SCR_LOAD_ANIM_NONE, 500, 500, &ui_Screen3_screen_init);
+            char* taskname = find_task_by_position(task_list,chosenTaskNum);
+            char *sname = (char*)(malloc(strlen(taskname)+strlen("\n\n\n\nTimeCountdown:")));
+            sprintf(sname,"%s%s",taskname,"\n\n\n\nTimeCountdown:");
+            lv_label_set_text(ui_Label7, sname);
+            free(sname);
+
+            ChangeState(Focus);
+        }
+        break;
+    
+    default:
+        break;
+    }
+    espnow_send_buf_reset(&espnow_recv_buf);
+}
+

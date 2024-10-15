@@ -67,6 +67,26 @@ void free_tasks(TaskNode *head);
 char* find_task_by_position(TaskNode *head, int position);
 void tasks2str(TaskNode *head);
 
+typedef struct{
+    uint8_t elabel_state;                 //State of elabel
+    uint8_t task_method;                  //1:修改任务内容，2：add任务，3:删任务
+    uint8_t changeTaskId;                      //若修改任务，任务ID
+    uint8_t msg_type;                    //0:啥都没变，1：elabel_State变了，2：task_method要执行了,3:state和method都要执行了
+    uint8_t chosenTaskId;                 //state = 3调用进入focus所选的任务
+    uint32_t TimeCountdown;               //state = 3调用倒计时时间
+    uint8_t *payload;
+} espnow_send_param_buf;
+
+espnow_send_param_buf espnow_send_buf;
+espnow_send_param_buf espnow_recv_buf;
+
+void espnow_send_buf_reset(espnow_send_param_buf* buff);
+
+void sync_to_slaves(const char *task_content);
+
+void sync_recv_update();
+
+
 typedef enum {
     Preparing,
     Operating,

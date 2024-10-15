@@ -56,15 +56,30 @@ enum {
     EXAMPLE_ESPNOW_DATA_MAX,
 };
 
+#define MAX_SLAVES 17
+#define ESPNOW_MAXDELAY 512
+
+extern uint8_t s_example_broadcast_mac[ESP_NOW_ETH_ALEN];
+extern uint8_t slave_num;
+extern uint8_t slave_mac[MAX_SLAVES][ESP_NOW_ETH_ALEN];
+QueueHandle_t s_example_espnow_queue;
+
 /* User defined field of ESPNOW data in this example. */
 typedef struct {
     uint8_t type;                         //Broadcast or unicast ESPNOW data.
     uint8_t state;                        //Indicate that if has received broadcast ESPNOW data or not.
+    uint8_t elabel_state;                 //State of elabel
+    uint8_t task_method;                  //1:修改任务内容，2：add任务，3:删任务
+    uint8_t changeTaskId;                      //若修改任务，任务ID
+    uint8_t msg_type;                    //0:啥都没变，1：elabel_State变了，2：task_method要执行了,3:state和method都要执行了
+    uint8_t chosenTaskId;                 //state = 3调用进入focus所选的任务
     uint16_t seq_num;                     //Sequence number of ESPNOW data.
     uint16_t crc;                         //CRC16 value of ESPNOW data.
     uint32_t magic;                       //Magic number which is used to determine which device to send unicast ESPNOW data.
+    uint32_t TimeCountdown;               //state = 3调用倒计时时间
     uint8_t payload[0];                   //Real payload of ESPNOW data.
 } __attribute__((packed)) example_espnow_data_t;
+
 
 /* Parameters of sending ESPNOW data. */
 typedef struct {
@@ -77,7 +92,17 @@ typedef struct {
     int len;                              //Length of ESPNOW data to be sent, unit: byte.
     uint8_t *buffer;                      //Buffer pointing to ESPNOW data.
     uint8_t dest_mac[ESP_NOW_ETH_ALEN];   //MAC address of destination device.
+
+    uint8_t elabel_state;                 //State of elabel
+    uint8_t task_method;                  //1:修改任务内容，2：add任务，3:删任务
+    uint8_t changeTaskId;                      //若修改任务，任务ID
+    uint8_t msg_type;                    //0:啥都没变，1：elabel_State变了，2：task_method要执行了,3:state和method都要执行了
+    uint8_t chosenTaskId;                 //state = 3调用进入focus所选的任务
+    uint32_t TimeCountdown;               //state = 3调用倒计时时间
+
 } example_espnow_send_param_t;
+
+example_espnow_send_param_t *send_param;
 
 typedef struct {
     uint8_t id;
@@ -121,6 +146,8 @@ void Z_WiFi_Init(void);
 
 esp_http_client_event_handle_t client;            //http客户端句柄
 esp_mqtt_client_handle_t emcht;             //MQTT客户端句柄
+
+uint8_t BoardcasttoPair;
 
 void http_client_sendMsg(esp_http_client_event_handle_t client, http_task_t task);
 
