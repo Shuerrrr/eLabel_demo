@@ -500,7 +500,7 @@ void sync_recv_update()
     case 1:
         if(espnow_recv_buf.elabel_state == 1)
         {
-            _ui_screen_change(&ui_Screen1, LV_SCR_LOAD_ANIM_NONE, 500, 500, &ui_Screen3_screen_init);
+            _ui_screen_change(&ui_Screen1, LV_SCR_LOAD_ANIM_NONE, 500, 500, &ui_Screen1_screen_init);
             ChangeState(Preparing);
         }
         else if(espnow_recv_buf.elabel_state == 2)
@@ -508,6 +508,7 @@ void sync_recv_update()
             OperatingLabelFlag = false;
             chosenTaskNum = espnow_recv_buf.chosenTaskId;
             printf("change into Operating\n");
+            _ui_screen_change(&ui_Screen2, LV_SCR_LOAD_ANIM_NONE, 500, 500, &ui_Screen2_screen_init);
             ChangeState(Operating);
         }
         else if(espnow_recv_buf.elabel_state == 3)
@@ -566,7 +567,7 @@ void sync_recv_update()
 
         if(espnow_recv_buf.elabel_state == 1)
         {
-            _ui_screen_change(&ui_Screen1, LV_SCR_LOAD_ANIM_NONE, 500, 500, &ui_Screen3_screen_init);
+            _ui_screen_change(&ui_Screen1, LV_SCR_LOAD_ANIM_NONE, 500, 500, &ui_Screen1_screen_init);
             ChangeState(Preparing);
         }
         else if(espnow_recv_buf.elabel_state == 2)
@@ -574,6 +575,7 @@ void sync_recv_update()
             OperatingLabelFlag = false;
             chosenTaskNum = espnow_recv_buf.chosenTaskId;
             printf("change into Operating\n");
+            _ui_screen_change(&ui_Screen2, LV_SCR_LOAD_ANIM_NONE, 500, 500, &ui_Screen2_screen_init);
             ChangeState(Operating);
         }
         else if(espnow_recv_buf.elabel_state == 3)
