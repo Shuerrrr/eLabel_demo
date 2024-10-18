@@ -22,9 +22,7 @@ extern "C" {
 #include "ui/ui.h"
 #include "esp_vfs_fat.h"
 #include "sdmmc_cmd.h"
-#include "mqtt_client_test.h"
-
-#include "cJSON/cJSON.h"
+#include "m_esp_now.h"
 
 /* Littlevgl specific */
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
@@ -36,6 +34,7 @@ extern "C" {
 #include "lvgl_helpers.h"
 
 
+
 // 定义任务节点结构
 #define BUTTON_GPIO1 2
 #define ENCODER_K2 3
@@ -43,6 +42,25 @@ extern "C" {
 
 bool needFlashEpaper;
 char taskstr[256];
+
+typedef enum {
+    HTTP_NO_TASK,
+    HTTP_ENTER_FOCUS,
+    HTTP_OUT_FOCUS,
+    HTTP_DELETE_TODO,
+} MainTask_Http_State;
+
+typedef enum {
+    TASK_NO_CHANGE,
+    ADD_TASK,
+    DELETE_TASK,
+    UPDATE_TASK,
+} APP_task_state;
+
+MainTask_Http_State mainTask_http_state;
+uint8_t chosenTaskNUM_HTTP;
+
+APP_task_state APP_TASK(void);
 
 typedef struct TaskNode {
     char *task;               // 任务字符串
@@ -98,6 +116,7 @@ ELABEL_STATE label_state;
 void ChangeState(ELABEL_STATE state);
 void Execute();
 void Enter(ELABEL_STATE state);
+void Exit(ELABEL_STATE state);
 void stateInit();
 // void Exit(ELABEL_STATE state);
 

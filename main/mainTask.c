@@ -16,9 +16,9 @@
 #include "ui/ui.h"
 #include "esp_vfs_fat.h"
 #include "sdmmc_cmd.h"
-#include "mqtt_client_test.h"
-
-#include "cJSON/cJSON.h"
+#include "m_esp_now.h"
+#include "global_message/global_message.h"
+#include "esp_http_client.h"
 
 /* Littlevgl specific */
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
@@ -53,6 +53,27 @@ TaskNode* create_task(const char* task_content) {
     return new_task;
 }
 
+//修改任务内容
+void modify_task(TaskNode *head, int position, const char *task_content) {
+    TaskNode *temp = head;
+    int index = 0;
+
+    // 遍历链表直到找到指定位置的任务
+    while (temp != NULL) {
+        if (index == position) {
+            free(temp->task);  // 释放原任务字符串的内存
+            temp->task = strdup(task_content);  // 复制新的任务内容
+            printf("任务 \"%s\" 修改成功！\n", task_content);
+            return;
+        }
+        temp = temp->next;
+        index++;
+    }
+
+    // 如果超出了链表长度，打印错误信息
+    printf("指定位置的任务不存在！\n");
+}
+
 // 添加任务到链表末尾
 void add_task(TaskNode **head, const char *task_content) {
     TaskNode *new_task = create_task(task_content);
@@ -84,6 +105,7 @@ void delete_task(TaskNode **head, int position) {
         printf("任务 \"%s\" 已删除\n", temp->task);
         free(temp->task);  // 释放任务字符串的内存
         free(temp);        // 释放节点的内存
+        tasklen--;
         return;
     }
 
@@ -100,10 +122,10 @@ void delete_task(TaskNode **head, int position) {
 
     TaskNode *next = temp->next->next;
     printf("任务 \"%s\" 已删除\n", temp->next->task);
+    tasklen--;
     free(temp->next->task);  // 释放任务字符串的内存
     free(temp->next);        // 释放节点的内存
     temp->next = next;
-    tasklen--;
 }
 
 // 打印任务列表
@@ -188,9 +210,29 @@ void stateInit()
     TimeTick = 0;
 }
 
+void Exit(ELABEL_STATE state)
+{
+    TodoList* todolist = get_global_data()->m_todo_list;
+    switch (state)
+    {
+    case Preparing:
+        break;
+    case Operating:
+        break;
+    case Focus:
+        mainTask_http_state = HTTP_OUT_FOCUS;
+        chosenTaskNUM_HTTP = chosenTaskNum;
+        break;
+    case Stopping:
+        break;
+    default:
+        break;
+    }
+}
+
 void ChangeState(ELABEL_STATE state)
 {
-    // Exit(label_state);
+    Exit(label_state);
     Enter(state);
     label_state = state;
 }
@@ -199,12 +241,14 @@ void ChangeState(ELABEL_STATE state)
 
 void Enter(ELABEL_STATE state)
 {
+    TodoList* todolist = get_global_data()->m_todo_list;
     switch (state)
     {
     case Preparing:
         EncoderValue = lastEncoderValue = 0;
         if(!tasklen) task_list = NULL;
-        chosenTaskNum = 0;
+        // chosenTaskNum = 0;
+        _button_tick_buf = TimeTick;
         needFlashEpaper = true;
         break;
     case Operating:
@@ -213,11 +257,13 @@ void Enter(ELABEL_STATE state)
         EncoderValue = lastEncoderValue = 0;
         needFlashEpaper = true;
         TimeCountdownOffset = TimeCountdown = 120;
-        _button_tick_buf = 0;
+        _button_tick_buf = TimeTick;
         break;
     case Focus:
         needFlashEpaper = true;
         _button_tick_buf = TimeTick;
+        mainTask_http_state = HTTP_ENTER_FOCUS;
+        chosenTaskNUM_HTTP = chosenTaskNum;
         break;
     case Stopping:
         needFlashEpaper = true;
@@ -232,6 +278,13 @@ void Execute()
     while(1)
     {
         sync_recv_update();
+        APP_task_state task_state = APP_TASK();
+        if(task_state != TASK_NO_CHANGE)//收APP消息
+        {
+            set_task_list_state(newest);//置标为newest
+            printf("APP_TASK: %d\n",task_state);
+            continue;
+        }
         switch (label_state)
         {
         case Preparing:
@@ -239,26 +292,58 @@ void Execute()
             //显示任务列表...needFlashEpaper写在通信中
             
             //按下按键确认changestate
-            if(!gpio_get_level(BUTTON_GPIO1) && task_list != NULL)
+            if(gpio_get_level(BUTTON_GPIO1))
             {
-                OperatingLabelFlag = true;
-                lv_event_send(lv_scr_act(), LV_EVENT_CLICKED, NULL);
-                char* taskname = find_task_by_position(task_list,chosenTaskNum);
+                if(TimeTick - _button_tick_buf > 10 && TimeTick - _button_tick_buf < 200 
+                && task_list != NULL) //&& send_param->state)
+                {
+                    OperatingLabelFlag = true;
+                    lv_event_send(lv_scr_act(), LV_EVENT_CLICKED, NULL);
+                    char* taskname = find_task_by_position(task_list,chosenTaskNum);
 
-                char *sname = (char*)(malloc(strlen(taskname)+strlen("\n\n\n\nTimeSet:")));
-                sprintf(sname,"%s%s",taskname,"\n\n\n\nTimeSet:");
-                lv_label_set_text(ui_Label3, sname);
-                free(sname);
-                
-                ChangeState(Operating);
-                espnow_send_buf.msg_type = 1;
-                espnow_send_buf.elabel_state = 2;
-                espnow_send_buf.chosenTaskId = chosenTaskNum;
-                
-                sync_to_slaves(NULL);
+                    char *sname = (char*)(malloc(strlen(taskname)+strlen("\n\n\n\nTimeSet:")));
+                    sprintf(sname,"%s%s",taskname,"\n\n\n\nTimeSet:");
+                    lv_label_set_text(ui_Label3, sname);
+                    free(sname);
+                    
+                    ChangeState(Operating);
+                    espnow_send_buf.msg_type = 1;
+                    espnow_send_buf.elabel_state = 2;
+                    espnow_send_buf.chosenTaskId = chosenTaskNum;
+                    
+                    sync_to_slaves(NULL);
 
-                printf("change into Operating\n");
-                continue;
+                    printf("change into Operating\n");
+                    continue;
+                }
+                else if(TimeTick - _button_tick_buf >= 200)
+                {
+                    send_param->state = (send_param->state)? 0 : 1;
+                    printf("enter pairing mode\n");
+                    //进入配对模式
+                    if(send_param->state == 0)
+                    {
+                        uint8_t *mac_addr = s_example_broadcast_mac;
+                        example_espnow_event_t evt;
+                        example_espnow_event_send_cb_t *send_cb = &evt.info.send_cb;
+
+                        if (mac_addr == NULL) {
+                            // ESP_LOGE(TAG, "Send cb arg error");
+                            return;
+                        }
+
+                        evt.id = EXAMPLE_ESPNOW_SEND_CB;
+                        memcpy(send_cb->mac_addr, mac_addr, ESP_NOW_ETH_ALEN);
+                        // send_cb->status = status;
+                        if (xQueueSend(s_example_espnow_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
+                            printf("Send send queue fail\n");
+                        }
+                    }
+                }
+                else
+                {
+                    _button_tick_buf = TimeTick;
+                }
             }
 
             if(tasklen)//旋钮选择任务
@@ -394,6 +479,9 @@ void Execute()
                         lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
                         lv_event_send(lv_scr_act(), LV_EVENT_CLICKED, NULL);
                         ChangeState(Preparing);
+
+                        mainTask_http_state = HTTP_DELETE_TODO;
+                        chosenTaskNUM_HTTP = chosenTaskNum;
 
                         espnow_send_buf.msg_type = 3;
                         espnow_send_buf.elabel_state = 1;
@@ -620,3 +708,69 @@ void sync_recv_update()
     espnow_send_buf_reset(&espnow_recv_buf);
 }
 
+
+APP_task_state APP_TASK(void)
+{
+    if(get_task_list_state() != firmware_need_update) return TASK_NO_CHANGE;
+    else printf("task_list_state is firmware_need_update\n");
+    
+    TodoList* todolist = get_global_data()->m_todo_list;
+
+    if(todolist->size > tasklen)
+    {
+        for(int i = tasklen;i < todolist->size;i++)
+        {
+            add_task(&task_list, todolist->items[i].title);
+            espnow_send_buf.msg_type = 2;
+            espnow_send_buf.task_method = 2;
+            sync_to_slaves(todolist->items[i].title);
+        }
+        tasklen = todolist->size;
+        tasks2str(task_list);
+        lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
+        return ADD_TASK;
+    }
+    else if(todolist->size < tasklen)
+    {
+        int temp = tasklen;
+        for(int i = 0; i < temp;i++)
+        {
+            char *task_title = find_task_by_position(task_list, i);
+            if(task_title == NULL) continue;
+            TodoItem* item = find_todo_by_title(todolist, task_title);
+            if(item == NULL)
+            {
+                delete_task(&task_list, i);
+                espnow_send_buf.msg_type = 2;
+                espnow_send_buf.task_method = 3;
+                espnow_send_buf.changeTaskId = i;
+                i--;
+                sync_to_slaves(NULL);
+            }
+        }
+
+        // tasklen = todolist->size;
+        printf("tasklen: %d\n",tasklen);
+        tasks2str(task_list);
+        lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
+        return DELETE_TASK;
+    }
+    else
+    {
+        for(int i = 0; i < tasklen;i++)
+        {
+            TodoItem* item = find_todo_by_title(todolist, find_task_by_position(task_list, i));
+            if(item == NULL)
+            {
+                modify_task(task_list, i, todolist->items[i].title);
+                espnow_send_buf.msg_type = 2;
+                espnow_send_buf.task_method = 1;
+                espnow_send_buf.changeTaskId = i;
+                sync_to_slaves(todolist->items[i].title);
+            }
+        }
+        tasks2str(task_list);
+        lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
+        return UPDATE_TASK;
+    }
+}

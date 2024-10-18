@@ -25,10 +25,14 @@
 #include "ui/ui.h"
 #include "esp_vfs_fat.h"
 #include "sdmmc_cmd.h"
-#include "mqtt_client_test.h"
+#include "m_esp_now.h"
 #include "main.h"
 
-#include "cJSON/cJSON.h"
+#include "network.h"
+#include "http.h"
+#include "ota.h"
+#include "m_mqtt.h"
+#include "global_message.h"
 
 /* Littlevgl specific */
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
@@ -52,6 +56,42 @@
         #error "No demo application selected."
     #endif
 #endif
+
+#define INT_TO_STRING(val, str) \
+    sprintf(str, "%d", val);
+
+bool is_elabel_init = false;
+
+void e_label_init()
+{
+    if(is_elabel_init) return;
+    is_elabel_init = true;
+    //等待连接两秒稳定
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
+
+    //同步时间
+    HTTP_syset_time();
+    get_unix_time();
+
+    //mqtt服务器初始化
+    mqtt_client_init();
+
+    //获取最新版本固件
+    http_get_latest_version(true);
+    if(get_global_data()->newest_firmware_url!=NULL)
+    {
+        start_ota();
+    }
+    else{
+        ESP_LOGI("OTA", "No need OTA, newest version");
+    }
+    // http_get_todo_list(true);
+    // http_add_to_do("fuck","fuck",false);
+    // http_in_focus("2",300,false);
+    // http_out_focus("2",false);
+    // http_delet_todo("2",false);
+    ESP_LOGE("fuck you", "fuck you");
+}
 
 /*********************
  *      DEFINES
@@ -177,11 +217,6 @@ static void SDcard_init()
 }
 
 
-// static void SDcard_deinit(sdmmc_card_t *card)
-// {
-    
-// }
-
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
     uint32_t gpio_num = (uint32_t) arg;
@@ -211,8 +246,11 @@ static void IRAM_ATTR gpio_isr_handler(void* arg)
     else if(gpio_num == BUTTON_GPIO1)
     {
         // lv_event_send(lv_scr_act(), LV_EVENT_CLICKED, NULL);  // Trigger the click event
-        EncoderValue = 0;
-        lastEncoderValue = 0;
+        if(label_state != Preparing)
+        {
+            EncoderValue = 0;
+            lastEncoderValue = 0;
+        }
     }
     // xQueueSendFromISR(gpioEventQueue, &gpio_num, NULL);
 }
@@ -286,8 +324,10 @@ void app_main() {
      * Otherwise there can be problem such as memory corruption and so on.
      * NOTE: When not using Wi-Fi nor Bluetooth you can pin the guiTask to core 0 */
 
-    printf("Starting WIFI Test!\n");
-    Z_WiFi_Init();
+    wifi_connect();
+
+    http_client_init();//并创建httpclient更新线程
+
 
     printf("Starting LVGL example\n");
 
@@ -307,16 +347,50 @@ void app_main() {
     tasks2str(task_list);
     lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
 
-    xTaskCreate(Execute, "eLabelTask", 2048, NULL, 1, NULL);
+    xTaskCreate(Execute, "eLabelTask", 4096, NULL, 1, NULL);
 
     // sdmmc_card_t *card;
     // SDcard_init();
     // SDcard_deinit(card);
-
+    TodoList* todolist = get_global_data()->m_todo_list;
+    char sstr[12];
     while(1)
     {
-        pressed = gpio_get_level(BUTTON_GPIO1);
-        vTaskDelay(1000 / portTICK_RATE_MS);
+        // pressed = gpio_get_level(BUTTON_GPIO1);
+        // vTaskDelay(1000 / portTICK_RATE_MS);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        //当连上网之后有一些重要事情要做，比如获取最新版本
+        if(get_wifi_status() == 2)
+        {
+            e_label_init();
+        }
+        switch(mainTask_http_state)
+        {
+            case HTTP_NO_TASK:
+                break;
+            case HTTP_OUT_FOCUS:
+                INT_TO_STRING(todolist->items[chosenTaskNUM_HTTP].id, sstr)
+                printf("title: %s",todolist->items[chosenTaskNUM_HTTP].title);
+                printf("OUT_FOCUS :chosenTaskNUM_HTTP: %d\n",chosenTaskNUM_HTTP);
+                http_out_focus(sstr,false);
+                mainTask_http_state = HTTP_NO_TASK;
+                break;
+            case HTTP_DELETE_TODO:
+                INT_TO_STRING(todolist->items[chosenTaskNUM_HTTP].id, sstr)
+                printf("title: %s",todolist->items[chosenTaskNUM_HTTP].title);
+                printf("DELETE :chosenTaskNUM_HTTP: %d\n",chosenTaskNUM_HTTP);
+                http_delet_todo(sstr,false);
+                mainTask_http_state = HTTP_NO_TASK;
+                break;
+            case HTTP_ENTER_FOCUS:
+                INT_TO_STRING(todolist->items[chosenTaskNUM_HTTP].id, sstr)
+                printf("title: %s",todolist->items[chosenTaskNUM_HTTP].title);
+                printf("ENTER :chosenTaskNUM_HTTP: %d\n",chosenTaskNUM_HTTP);
+                http_in_focus(sstr,TimeCountdown,false);
+                mainTask_http_state = HTTP_NO_TASK;
+                break;
+        }
+
         // if(client) http_client_sendMsg(client,FINDLATESTVERSION);
         // printf("encodervalue: %d,pressed: %d \n", EncoderValue,pressed);
         // buzzer_pwm_start(1000);
