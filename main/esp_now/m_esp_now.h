@@ -15,7 +15,7 @@ extern "C" {
 #define ESPNOW_WIFI_IF   ESP_IF_WIFI_AP
 #endif
 
-#define ESPNOW_QUEUE_SIZE 6 //6
+#define ESPNOW_QUEUE_SIZE 18 //6
 #define ESP_NOW_ETH_ALEN 6
 
 #define IS_BROADCAST_ADDR(addr) (memcmp(addr, s_example_broadcast_mac, ESP_NOW_ETH_ALEN) == 0)

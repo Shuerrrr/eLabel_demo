@@ -33,6 +33,7 @@
 #include "ota.h"
 #include "m_mqtt.h"
 #include "global_message.h"
+#include "m_esp_now.h"
 
 /* Littlevgl specific */
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
@@ -61,10 +62,67 @@
     sprintf(str, "%d", val);
 
 bool is_elabel_init = false;
+bool first_connect_to_wifi = true;
+
+uint8_t getUsing_wifi_channel()
+{
+    return using_wifi_channel;
+}
+
+void setUsing_wifi_channel(uint8_t channel)
+{
+    using_wifi_channel = channel;
+}
 
 void e_label_init()
 {
-    if(is_elabel_init) return;
+    if(is_elabel_init && first_connect_to_wifi) 
+    {
+        esp_wifi_get_channel(&using_wifi_channel,NULL);
+        fake_disconnect();
+        esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
+
+        espnow_send_buf.msg_type = 5;
+        espnow_send_buf.TimeCountdown = using_wifi_channel;
+        for(int i = 0; i < 3; i++)
+        {
+            vTaskDelay(20 / portTICK_PERIOD_MS);
+            sync_to_slaves(NULL);
+        }
+        fake_connect();
+        first_connect_to_wifi = false;
+
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        for(int i = 0 ;i < getMacNum(); i++)
+        {
+            uint8_t *mac = getMacAddr(i);
+            esp_now_peer_info_t peer1;
+            esp_now_get_peer(mac, &peer1);
+
+            if(peer1.channel != using_wifi_channel)
+            {
+                esp_now_peer_info_t *newpeer = malloc(sizeof(esp_now_peer_info_t));
+                if (newpeer == NULL) {
+                    ESP_LOGE("TAG", "Malloc peer information fail");
+                }
+                memset(newpeer, 0, sizeof(esp_now_peer_info_t));
+                newpeer->channel = using_wifi_channel;
+                newpeer->ifidx = ESPNOW_WIFI_IF;
+                newpeer->encrypt = false;
+                memcpy(newpeer->lmk, CONFIG_ESPNOW_LMK, ESP_NOW_KEY_LEN);
+                memcpy(newpeer->peer_addr, mac, ESP_NOW_ETH_ALEN);
+                ESP_ERROR_CHECK( esp_now_add_peer(newpeer) );
+                free(newpeer);
+            }
+        }
+
+        return;
+    }
+    else if(is_elabel_init && !first_connect_to_wifi)
+    {
+        esp_wifi_get_channel(&using_wifi_channel,NULL);
+        return;
+    }
     is_elabel_init = true;
     //等待连接两秒稳定
     vTaskDelay(2000 / portTICK_PERIOD_MS);
@@ -318,6 +376,7 @@ static void buzzer_pwm_start(uint32_t new_frequency)
 /**********************
  *   APPLICATION MAIN
  **********************/
+bool connectwifi_onetime = true;
 void app_main() {
 
     /* If you want to use a task to create the graphic, you NEED to create a Pinned task
@@ -347,25 +406,70 @@ void app_main() {
     tasks2str(task_list);
     lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
 
-    xTaskCreate(Execute, "eLabelTask", 4096, NULL, 1, NULL);
+    xTaskCreate(Execute, "eLabelTask", 4096*2, NULL, 1, NULL);
+    using_wifi_channel = 1;
+    stop_mainTask = false;
 
     // sdmmc_card_t *card;
     // SDcard_init();
     // SDcard_deinit(card);
     TodoList* todolist = get_global_data()->m_todo_list;
+    uint16_t whiletick = 0;
+    refresh_slave_tasklist_flag = true;
     char sstr[12];
+    UBaseType_t istack;
     while(1)
     {
+        whiletick++;
         // pressed = gpio_get_level(BUTTON_GPIO1);
         // vTaskDelay(1000 / portTICK_RATE_MS);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        vTaskDelay(10 / portTICK_PERIOD_MS);
+        if(whiletick % 100 == 0)
+        {
+            istack = uxTaskGetStackHighWaterMark(pxespnowTask);
+            // printf("task espnow stack = %d\n",istack);
+        }
         //当连上网之后有一些重要事情要做，比如获取最新版本
         if(get_wifi_status() == 2)
         {
             e_label_init();
+            stop_mainTask = false;
         }
-        switch(mainTask_http_state)
+        else if(get_wifi_status() == 0)
         {
+            esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
+            stop_mainTask = false;
+        }
+        else if(get_wifi_status() == 1)
+        {
+            stop_mainTask = true;
+        }
+
+        if(send_param->state == 0)
+        {
+            fake_disconnect();
+            esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
+            send_param->msg_type = 5;
+            send_param->TimeCountdown = using_wifi_channel;
+            connectwifi_onetime = true;
+        }
+        else if(send_param->state == 1 && get_wifi_status() == 0 && connectwifi_onetime)
+        {
+            fake_connect();
+            printf("wifi_connenct!fucksakdhfjashgf\n");
+            connectwifi_onetime = false;
+        }
+
+        if(get_wifi_status() == 2 && refresh_slave_tasklist_flag == false)
+        {
+            refresh_slaves_tasklist();
+            refresh_slave_tasklist_flag = true;
+        }
+
+        if(get_wifi_status() == 2)
+        {
+            switch(mainTask_http_state)
+            {  
             case HTTP_NO_TASK:
                 break;
             case HTTP_OUT_FOCUS:
@@ -389,7 +493,19 @@ void app_main() {
                 http_in_focus(sstr,TimeCountdown,false);
                 mainTask_http_state = HTTP_NO_TASK;
                 break;
+            case HTTP_OUTFOCUS_DELETE_TODO:
+                INT_TO_STRING(todolist->items[chosenTaskNUM_HTTP].id, sstr)
+                printf("title: %s",todolist->items[chosenTaskNUM_HTTP].title);
+                printf("OUTFOCUS_DELETE :chosenTaskNUM_HTTP: %d\n",chosenTaskNUM_HTTP);
+                http_out_focus(sstr,false);
+                http_delet_todo(sstr,false);
+                mainTask_http_state = HTTP_NO_TASK;
+                break;
+            default:
+                break;
+            }
         }
+        
 
         // if(client) http_client_sendMsg(client,FINDLATESTVERSION);
         // printf("encodervalue: %d,pressed: %d \n", EncoderValue,pressed);
@@ -564,3 +680,16 @@ static void lv_tick_task(void *arg) {
 
     lv_tick_inc(LV_TICK_PERIOD_MS);
 }
+
+void refresh_slaves_tasklist()
+{
+    for(int i = 0;i < tasklen; i++)
+    {
+        espnow_send_buf.msg_type = 2;
+        espnow_send_buf.task_method = 2;
+        sync_to_slaves(find_task_by_position(task_list,i));
+        printf("tasklist: %s\n",find_task_by_position(task_list,i));
+
+    }
+}
+

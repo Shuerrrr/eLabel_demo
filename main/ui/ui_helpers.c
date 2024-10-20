@@ -4,6 +4,8 @@
 // Project name: SquareLine_Project
 
 #include "ui_helpers.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 void _ui_bar_set_property(lv_obj_t * target, int id, int val)
 {

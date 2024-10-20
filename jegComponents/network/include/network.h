@@ -16,10 +16,16 @@
 
 void wifi_connect(void);
 
+void fake_connect(void);
+
 void wifi_disconnect(void);
+
+void fake_disconnect(void);
 
 void start_blufi(void);//随便调用内部有锁
 
 uint8_t get_wifi_status(void);
+
+void set_wifi_status(uint8_t status);
 
 #endif

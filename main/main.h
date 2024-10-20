@@ -41,13 +41,20 @@ extern "C" {
 #define ENCODER_K 1
 
 bool needFlashEpaper;
+bool stop_mainTask;
 char taskstr[256];
+TaskHandle_t pxespnowTask;
+
+uint8_t getUsing_wifi_channel();
+
+void setUsing_wifi_channel(uint8_t channel);
 
 typedef enum {
     HTTP_NO_TASK,
     HTTP_ENTER_FOCUS,
     HTTP_OUT_FOCUS,
     HTTP_DELETE_TODO,
+    HTTP_OUTFOCUS_DELETE_TODO,
 } MainTask_Http_State;
 
 typedef enum {
@@ -87,9 +94,9 @@ void tasks2str(TaskNode *head);
 
 typedef struct{
     uint8_t elabel_state;                 //State of elabel
-    uint8_t task_method;                  //1:修改任务内容，2：add任务，3:删任务
+    uint8_t task_method;                  //1:修改任务内容，2：add任务，3:删任务, 4:全删
     uint8_t changeTaskId;                      //若修改任务，任务ID
-    uint8_t msg_type;                    //0:啥都没变，1：elabel_State变了，2：task_method要执行了,3:state和method都要执行了
+    uint8_t msg_type;                    //0:啥都没变，1：elabel_State变了，2：task_method要执行了,3:state和method都要执行了,5:同步channel，读timecountdown
     uint8_t chosenTaskId;                 //state = 3调用进入focus所选的任务
     uint32_t TimeCountdown;               //state = 3调用倒计时时间
     uint8_t payload[50];
@@ -104,6 +111,9 @@ void sync_to_slaves(const char *task_content);
 
 void sync_recv_update();
 
+uint8_t getMacNum();
+
+uint8_t* getMacAddr(uint8_t num);
 
 typedef enum {
     Preparing,
@@ -131,6 +141,8 @@ bool OperatingLabelFlag;
 uint32_t TimeTick;
 uint32_t _button_tick_buf;
 uint8_t statetype; //防止label多次刷新
+bool refresh_slave_tasklist_flag;
+void refresh_slaves_tasklist();
 
 
 

@@ -16,6 +16,11 @@ uint8_t get_wifi_status(void)
     return wifi_state;
 }
 
+void set_wifi_status(uint8_t status)
+{
+    wifi_state = status;
+}
+
 void wifi_connect(void)
 {
     if(!is_wifi_preprocess)
@@ -28,6 +33,18 @@ void wifi_connect(void)
         wifi_init_sta();  
         is_wifi_init = true;
     }
+}
+
+void fake_disconnect(void)
+{
+    esp_wifi_disconnect();
+    wifi_state = 0x00;     
+}
+
+void fake_connect(void)
+{
+    esp_wifi_connect();    
+    wifi_state = 0x01;   
 }
 
 void wifi_disconnect(void)
@@ -139,7 +156,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,int32_t event_i
             retry_num++;
             ESP_LOGI(WIFI_CONNECT,"retry to connect to the AP %d times. \n",retry_num);
             ESP_LOGI(WIFI_CONNECT,"Retry connecting wifi with Password: %s and ssid %s\n", wifi_passwd, wifi_ssid);
-            if (retry_num > 10)  /* WiFi重连次数大于10 */
+            if (retry_num > 3)  /* WiFi重连次数大于10 */
             {
                 /* 将WiFi连接事件标志组的WiFi连接失败事件位置1 */
                 ESP_LOGE(WIFI_CONNECT,"Fail connecting wifi with Password: %s and ssid %s\n", wifi_passwd, wifi_ssid);
@@ -219,7 +236,6 @@ static void get_nvs_info(void)
 
     wifi_state = 0x00;
     is_blufi_init = false;
-    is_release_classic_ble = false;
 
     //...................................获取在NVS中存储的信息..........................................//
     nvs_handle wificfg_nvs_handler; /* 定义一个NVS操作句柄 */

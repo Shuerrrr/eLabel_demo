@@ -14,6 +14,9 @@ void HTTP_syset_time(void);
 
 long long get_unix_time(void);
 
+bool first_time_to_sync_tasklist;
+uint8_t using_wifi_channel;
+
 //--------------------------------------Focus 对应的结构体--------------------------------------//
 typedef struct {
     bool is_focus; 
