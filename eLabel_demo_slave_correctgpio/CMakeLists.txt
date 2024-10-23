@@ -1,0 +1,12 @@
+cmake_minimum_required(VERSION 3.5)
+
+if (NOT DEFINED PROJECT_NAME)
+    set(EXTRA_COMPONENT_DIRS ${EXTRA_COMPONENT_DIRS} jegComponents/network)
+    set(EXTRA_COMPONENT_DIRS ${EXTRA_COMPONENT_DIRS} jegComponents/http)
+    set(EXTRA_COMPONENT_DIRS ${EXTRA_COMPONENT_DIRS} jegComponents/ota)
+    set(EXTRA_COMPONENT_DIRS ${EXTRA_COMPONENT_DIRS} jegComponents/m_mqtt)
+    include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+    project(lvgl-demo)
+else()
+    message(FATAL_ERROR "LV PORT ESP32: This must be a project's main CMakeLists.txt.")
+endif()
