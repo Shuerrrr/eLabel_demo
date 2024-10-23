@@ -168,7 +168,6 @@ void e_label_init()
 #define EC56_GPIO_A 21
 #define EC56_GPIO_B 47
 
-#define BUTTON_GPIO1 2
 
 #define BUZZER_GPIO_PWM 8
 static uint8_t flag = 0;
@@ -466,7 +465,7 @@ void app_main() {
             refresh_slave_tasklist_flag = true;
         }
 
-        if(get_wifi_status() == 2)
+        if(get_wifi_status() == 2 && todolist->size != 0)
         {
             switch(mainTask_http_state)
             {  
@@ -683,6 +682,10 @@ static void lv_tick_task(void *arg) {
 
 void refresh_slaves_tasklist()
 {
+    espnow_send_buf.msg_type = 2;
+    espnow_send_buf.task_method = 4;
+    sync_to_slaves(NULL);
+
     for(int i = 0;i < tasklen; i++)
     {
         espnow_send_buf.msg_type = 2;

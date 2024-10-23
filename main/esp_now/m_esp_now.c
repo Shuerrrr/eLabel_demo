@@ -151,7 +151,7 @@ static void example_espnow_task(void *pvParameter)
                     //     }
                     //     send_param->count--;
                     // }
-                    
+                    example_espnow_data_prepare(send_param);
                     if(is_broadcast)
                     {
                         vTaskDelay(send_param->delay/portTICK_PERIOD_MS);
@@ -159,7 +159,6 @@ static void example_espnow_task(void *pvParameter)
                         ESP_LOGI(TAG, "send data to "MACSTR"", MAC2STR(send_cb->mac_addr));
 
                         memcpy(send_param->dest_mac, send_cb->mac_addr, ESP_NOW_ETH_ALEN);
-                        example_espnow_data_prepare(send_param);
 
                         /* Send the next data after the previous data is sent. */
                         printf("send_param->len = %d\n",send_param->len);
@@ -175,11 +174,20 @@ static void example_espnow_task(void *pvParameter)
                     {
                         for(int i = 0; i< slave_num;i++)
                         {
+                            if(espnow_send_buf.espnow_callback_flag == 1)
+                            {
+                                uint8_t *mac_addrrr = slave_mac[i];
+                                uint8_t *recv_mac_addr = send_cb->mac_addr;
+                                if(memcmp(mac_addrrr,recv_mac_addr,6) == 0)
+                                {
+                                    espnow_send_buf.espnow_callback_flag = 0;
+                                    continue;
+                                }
+                            }
                             vTaskDelay(20 / portTICK_PERIOD_MS);
                             uint8_t *mac_addrrr = slave_mac[i];
                             ESP_LOGI(TAG, "send data to "MACSTR"", MAC2STR(mac_addrrr));
                             memcpy(send_param->dest_mac, mac_addrrr, ESP_NOW_ETH_ALEN);
-                            example_espnow_data_prepare(send_param);
 
                             /* Send the next data after the previous data is sent. */
                             printf("send_param->len = %d\n",send_param->len);

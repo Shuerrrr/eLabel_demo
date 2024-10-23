@@ -27,6 +27,7 @@
 #endif
 
 #include "lvgl_helpers.h"
+#define OPERATE_SENSITIVITY 5
 
 
 uint8_t s_example_broadcast_mac[ESP_NOW_ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
@@ -160,6 +161,8 @@ void free_tasks(TaskNode *head) {
         free(temp->task);  // 释放任务字符串的内存
         free(temp);        // 释放节点的内存
     }
+    task_list = NULL;
+    tasklen = 0;
 }
 
 char* find_task_by_position(TaskNode *head, int position) {
@@ -440,7 +443,7 @@ void Execute()
                         statetype = 2;
                     }
                 
-                    TimeCountdown = TimeCountdownOffset + EncoderValue * 2;
+                    TimeCountdown = TimeCountdownOffset + EncoderValue * OPERATE_SENSITIVITY;
                     _button_tick_buf = TimeTick;
                 }
                 
@@ -675,6 +678,15 @@ void sync_recv_update()
             tasks2str(task_list);
             lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
         }
+        else if(espnow_recv_buf.task_method == 4)
+        {
+            if(espnow_recv_buf.changeTaskId == 0)
+            {
+                free_tasks(task_list);
+                tasks2str(task_list);
+                lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
+            }
+        }
         break;
     case 3:
         if(espnow_recv_buf.task_method == 2)
@@ -683,7 +695,7 @@ void sync_recv_update()
             tasks2str(task_list);
             lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
         }
-        else if(espnow_recv_buf.task_method == 3)
+        else if(espnow_recv_buf.task_method == 3 && label_state == Focus)
         {
             delete_task(&task_list, espnow_recv_buf.changeTaskId);
             tasks2str(task_list);
@@ -739,6 +751,31 @@ void sync_recv_update()
     default:
         break;
     }
+
+    if(slave_num && espnow_recv_buf.msg_type)
+    {
+        
+        example_espnow_event_t evt;
+        example_espnow_event_send_cb_t *send_cb = &evt.info.send_cb;
+        example_espnow_event_recv_cb_t *recv_cb = &evt.info.recv_cb;
+        uint8_t *receive_mac_addr = recv_cb->mac_addr;
+        
+
+        if (receive_mac_addr == NULL) {
+            // ESP_LOGE(TAG, "Send cb arg error");
+            return;
+        }
+
+        evt.id = EXAMPLE_ESPNOW_SEND_CB;
+        memcpy(send_cb->mac_addr, receive_mac_addr, ESP_NOW_ETH_ALEN);
+        espnow_send_buf.espnow_callback_flag = 1;
+        // send_cb->status = status;
+        if (xQueueSend(s_example_espnow_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
+            printf("Send send queue fail\n");
+        }
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+
     espnow_send_buf_reset(&espnow_recv_buf);
 }
 
