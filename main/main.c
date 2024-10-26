@@ -76,53 +76,54 @@ void setUsing_wifi_channel(uint8_t channel)
 
 void e_label_init()
 {
-    if(is_elabel_init && first_connect_to_wifi) 
-    {
-        esp_wifi_get_channel(&using_wifi_channel,NULL);
-        fake_disconnect();
-        esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
+    // if(is_elabel_init && first_connect_to_wifi) 
+    // {
+    //     esp_wifi_get_channel(&using_wifi_channel,NULL);
+    //     fake_disconnect();
+    //     esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
 
-        espnow_send_buf.msg_type = 5;
-        espnow_send_buf.TimeCountdown = using_wifi_channel;
-        for(int i = 0; i < 3; i++)
-        {
-            vTaskDelay(20 / portTICK_PERIOD_MS);
-            sync_to_slaves(NULL);
-        }
-        fake_connect();
-        first_connect_to_wifi = false;
+    //     espnow_send_buf.msg_type = 5;
+    //     espnow_send_buf.TimeCountdown = using_wifi_channel;
+    //     for(int i = 0; i < 3; i++)
+    //     {
+    //         vTaskDelay(20 / portTICK_PERIOD_MS);
+    //         sync_to_slaves(NULL);
+    //     }
+    //     fake_connect();
+    //     first_connect_to_wifi = false;
 
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        for(int i = 0 ;i < getMacNum(); i++)
-        {
-            uint8_t *mac = getMacAddr(i);
-            esp_now_peer_info_t peer1;
-            esp_now_get_peer(mac, &peer1);
+    //     vTaskDelay(1000 / portTICK_PERIOD_MS);
+    //     for(int i = 0 ;i < getMacNum(); i++)
+    //     {
+    //         uint8_t *mac = getMacAddr(i);
+    //         esp_now_peer_info_t peer1;
+    //         esp_now_get_peer(mac, &peer1);
 
-            if(peer1.channel != using_wifi_channel)
-            {
-                esp_now_peer_info_t *newpeer = malloc(sizeof(esp_now_peer_info_t));
-                if (newpeer == NULL) {
-                    ESP_LOGE("TAG", "Malloc peer information fail");
-                }
-                memset(newpeer, 0, sizeof(esp_now_peer_info_t));
-                newpeer->channel = using_wifi_channel;
-                newpeer->ifidx = ESPNOW_WIFI_IF;
-                newpeer->encrypt = false;
-                memcpy(newpeer->lmk, CONFIG_ESPNOW_LMK, ESP_NOW_KEY_LEN);
-                memcpy(newpeer->peer_addr, mac, ESP_NOW_ETH_ALEN);
-                ESP_ERROR_CHECK( esp_now_add_peer(newpeer) );
-                free(newpeer);
-            }
-        }
+    //         if(peer1.channel != using_wifi_channel)
+    //         {
+    //             esp_now_peer_info_t *newpeer = malloc(sizeof(esp_now_peer_info_t));
+    //             if (newpeer == NULL) {
+    //                 ESP_LOGE("TAG", "Malloc peer information fail");
+    //             }
+    //             memset(newpeer, 0, sizeof(esp_now_peer_info_t));
+    //             newpeer->channel = using_wifi_channel;
+    //             newpeer->ifidx = ESPNOW_WIFI_IF;
+    //             newpeer->encrypt = false;
+    //             memcpy(newpeer->lmk, CONFIG_ESPNOW_LMK, ESP_NOW_KEY_LEN);
+    //             memcpy(newpeer->peer_addr, mac, ESP_NOW_ETH_ALEN);
+    //             ESP_ERROR_CHECK( esp_now_add_peer(newpeer) );
+    //             free(newpeer);
+    //         }
+    //     }
 
-        return;
-    }
-    else if(is_elabel_init && !first_connect_to_wifi)
-    {
-        esp_wifi_get_channel(&using_wifi_channel,NULL);
-        return;
-    }
+    //     return;
+    // }
+    // else if(is_elabel_init && !first_connect_to_wifi)
+    // {
+    //     esp_wifi_get_channel(&using_wifi_channel,NULL);
+    //     return;
+    // }
+    if(is_elabel_init) return;
     is_elabel_init = true;
     //等待连接两秒稳定
     vTaskDelay(2000 / portTICK_PERIOD_MS);
@@ -138,7 +139,28 @@ void e_label_init()
     http_get_latest_version(true);
     if(get_global_data()->newest_firmware_url!=NULL)
     {
-        start_ota();
+        _ui_screen_change(&ui_Screen2, LV_SCR_LOAD_ANIM_NONE, 500, 500, &ui_Screen2_screen_init);
+        char *sname = (char*)(malloc(strlen("\n\n\n\nOTAING:")+1));
+        strcpy(sname,"\n\n\n\nOTAING:");
+        lv_label_set_text(ui_Label3, sname);
+        if(sname != NULL) free(sname);
+        EncoderValue = 0;
+        stop_mainTask = true;
+        while(true)
+        {
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            if(EncoderValue > 0)
+            {
+                start_ota();
+                break;
+            }
+            else if(EncoderValue < 0)
+            {
+                break;
+            }
+        }
+        EncoderValue = lastEncoderValue = 0;
+        stop_mainTask = false;
     }
     else{
         ESP_LOGI("OTA", "No need OTA, newest version");

@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-#define FIRMWARE_VERSION "2.0.0"
+#define FIRMWARE_VERSION "1.0.0"
 
 void SNTP_syset_time(void);
 
