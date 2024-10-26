@@ -156,7 +156,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,int32_t event_i
             retry_num++;
             ESP_LOGI(WIFI_CONNECT,"retry to connect to the AP %d times. \n",retry_num);
             ESP_LOGI(WIFI_CONNECT,"Retry connecting wifi with Password: %s and ssid %s\n", wifi_passwd, wifi_ssid);
-            if (retry_num > 3)  /* WiFi重连次数大于10 */
+            if (retry_num > 10)  /* WiFi重连次数大于10 */
             {
                 /* 将WiFi连接事件标志组的WiFi连接失败事件位置1 */
                 ESP_LOGE(WIFI_CONNECT,"Fail connecting wifi with Password: %s and ssid %s\n", wifi_passwd, wifi_ssid);

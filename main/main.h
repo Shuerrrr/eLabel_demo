@@ -144,6 +144,7 @@ uint32_t _button_tick_buf;
 uint8_t statetype; //防止label多次刷新
 bool refresh_slave_tasklist_flag;
 void refresh_slaves_tasklist();
+uint8_t last_recv_mac[6];
 
 
 

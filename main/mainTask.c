@@ -51,6 +51,7 @@ void espnow_send_buf_reset(espnow_send_param_buf* buff)
 {
     buff->msg_type = 0;
     buff->task_method = 0;
+    // buff->espnow_callback_flag = 0;
 }
 
 TaskNode* create_task(const char* task_content) {
@@ -554,6 +555,67 @@ void Execute()
     }
 }
 
+void sync_to_slaves_callback(const char *task_content,const uint8_t *recv_mac)
+{
+    if(send_param->state == 0) return;
+    send_param->msg_type = espnow_send_buf.msg_type;
+    send_param->task_method = espnow_send_buf.task_method;
+    send_param->elabel_state = espnow_send_buf.elabel_state;
+    send_param->chosenTaskId = espnow_send_buf.chosenTaskId;
+    send_param->TimeCountdown = espnow_send_buf.TimeCountdown;
+    send_param->changeTaskId = espnow_send_buf.changeTaskId;
+
+    switch(espnow_send_buf.msg_type)
+    {
+        case 1:
+        {
+            send_param->len = sizeof(example_espnow_data_t);
+            break;
+        }
+        case 2:
+            if(task_content != NULL)
+            {
+                send_param->len = strlen(task_content) + sizeof(example_espnow_data_t) + 1;
+                example_espnow_data_t *buf11 = (example_espnow_data_t*)send_param->buffer;
+                strcpy((char*)(buf11->payload), task_content);
+            }
+            break;
+        case 3:
+            if(task_content != NULL)
+            {
+                send_param->len = strlen(task_content) + 1 + sizeof(example_espnow_data_t);
+                example_espnow_data_t *buf22 = (example_espnow_data_t*)send_param->buffer;
+                strcpy((char*)(buf22->payload), task_content);
+            }
+            break;
+        default:
+            send_param->len = sizeof(example_espnow_data_t);
+            break;
+    }
+    // for(int i = 0; i < slave_num; i++)
+    // {
+    if(slave_num)
+    {
+        uint8_t *mac_addr = recv_mac;
+        example_espnow_event_t evt;
+        example_espnow_event_send_cb_t *send_cb = &evt.info.send_cb;
+
+        if (mac_addr == NULL) {
+            ESP_LOGE("fuck", "Send cb arg error");
+            return;
+        }
+
+        evt.id = EXAMPLE_ESPNOW_SEND_CB;
+        memcpy(send_cb->mac_addr, mac_addr, ESP_NOW_ETH_ALEN);
+        // send_cb->status = status;
+        if (xQueueSend(s_example_espnow_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
+            printf("Send send queue fail\n");
+        }
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+    espnow_send_buf_reset(&espnow_send_buf);
+}
+
 void sync_to_slaves(const char *task_content)
 {
     if(send_param->state == 0) return;
@@ -752,28 +814,21 @@ void sync_recv_update()
         break;
     }
 
-    if(slave_num && espnow_recv_buf.msg_type)
+    if(slave_num && espnow_recv_buf.msg_type && espnow_send_buf.espnow_callback_flag)
     {
-        
-        example_espnow_event_t evt;
-        example_espnow_event_send_cb_t *send_cb = &evt.info.send_cb;
-        example_espnow_event_recv_cb_t *recv_cb = &evt.info.recv_cb;
-        uint8_t *receive_mac_addr = recv_cb->mac_addr;
-        
+        espnow_send_buf.msg_type = espnow_recv_buf.msg_type;
+        espnow_send_buf.task_method = espnow_recv_buf.task_method;
+        espnow_send_buf.elabel_state = espnow_recv_buf.elabel_state;
+        espnow_send_buf.chosenTaskId = espnow_recv_buf.chosenTaskId;
+        espnow_send_buf.TimeCountdown = espnow_recv_buf.TimeCountdown;
+        espnow_send_buf.changeTaskId = espnow_recv_buf.changeTaskId;
 
-        if (receive_mac_addr == NULL) {
-            // ESP_LOGE(TAG, "Send cb arg error");
-            return;
+        if(last_recv_mac[0] == 0)
+        {
+            ESP_LOGI("fuuck","fuck you");
         }
+        sync_to_slaves_callback((char*)espnow_recv_buf.payload,last_recv_mac);
 
-        evt.id = EXAMPLE_ESPNOW_SEND_CB;
-        memcpy(send_cb->mac_addr, receive_mac_addr, ESP_NOW_ETH_ALEN);
-        espnow_send_buf.espnow_callback_flag = 1;
-        // send_cb->status = status;
-        if (xQueueSend(s_example_espnow_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
-            printf("Send send queue fail\n");
-        }
-        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 
     espnow_send_buf_reset(&espnow_recv_buf);

@@ -178,8 +178,14 @@ static void example_espnow_task(void *pvParameter)
                             {
                                 uint8_t *mac_addrrr = slave_mac[i];
                                 uint8_t *recv_mac_addr = send_cb->mac_addr;
+                                for(int i = 0; i < 6; i++)
+                                {
+                                    ESP_LOGE("fuck","%d",recv_mac_addr[i]);
+                                    ESP_LOGE("fuck","%d",mac_addrrr[i]);
+                                }
                                 if(memcmp(mac_addrrr,recv_mac_addr,6) == 0)
                                 {
+                                    ESP_LOGE("fuck","fuck");
                                     espnow_send_buf.espnow_callback_flag = 0;
                                     continue;
                                 }
@@ -289,6 +295,8 @@ static void example_espnow_task(void *pvParameter)
                     }
                     else if (ret == EXAMPLE_ESPNOW_DATA_UNICAST) {
                         ESP_LOGI(TAG, "Receive %dth unicast data from: "MACSTR", len: %d", recv_seq, MAC2STR(recv_cb->mac_addr), recv_cb->data_len);
+                        memcpy(last_recv_mac,recv_cb->mac_addr,6);
+                        espnow_send_buf.espnow_callback_flag = 1;
                         //配对后收到的unicast数据
                         /* If receive unicast ESPNOW data, also stop sending broadcast ESPNOW data. */
                         send_param->broadcast = false;
