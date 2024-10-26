@@ -448,6 +448,41 @@ esp_err_t example_espnow_init(void)
     }
     memcpy(send_param->dest_mac, s_example_broadcast_mac, ESP_NOW_ETH_ALEN);
     example_espnow_data_prepare(send_param);
+
+// d8:3b:da:97:ee:88
+// d8:3b:da:97:ee:24
+    uint8_t slave_mac_serve1[6] = {0xD8,0x3B,0xDA,0x97,0xEE,0x24};
+    uint8_t slave_mac_serve2[6] = {0xD8,0x3B,0xDA,0x97,0xEE,0x88};
+    if (esp_now_is_peer_exist(slave_mac_serve1) == false) {
+        esp_now_peer_info_t *peer = malloc(sizeof(esp_now_peer_info_t));
+        if (peer == NULL) {
+            ESP_LOGE(TAG, "Malloc peer information fail");
+        }
+        memset(peer, 0, sizeof(esp_now_peer_info_t));
+        peer->channel = 1;
+        peer->ifidx = ESPNOW_WIFI_IF;
+        peer->encrypt = false;
+        memcpy(peer->lmk, CONFIG_ESPNOW_LMK, ESP_NOW_KEY_LEN);
+        memcpy(peer->peer_addr, slave_mac_serve1, ESP_NOW_ETH_ALEN);
+        add_slave(slave_mac_serve1);
+        ESP_ERROR_CHECK( esp_now_add_peer(peer) );
+        free(peer);
+    }
+    if (esp_now_is_peer_exist(slave_mac_serve2) == false) {
+        esp_now_peer_info_t *peer = malloc(sizeof(esp_now_peer_info_t));
+        if (peer == NULL) {
+            ESP_LOGE(TAG, "Malloc peer information fail");
+        }
+        memset(peer, 0, sizeof(esp_now_peer_info_t));
+        peer->channel = 1;
+        peer->ifidx = ESPNOW_WIFI_IF;
+        peer->encrypt = false;
+        memcpy(peer->lmk, CONFIG_ESPNOW_LMK, ESP_NOW_KEY_LEN);
+        memcpy(peer->peer_addr, slave_mac_serve2, ESP_NOW_ETH_ALEN);
+        add_slave(slave_mac_serve2);
+        ESP_ERROR_CHECK( esp_now_add_peer(peer) );
+        free(peer);
+    }
     
     xTaskCreate(example_espnow_task, "example_espnow_task", 20000, send_param, 0, &pxespnowTask);
 
