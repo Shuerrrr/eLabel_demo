@@ -27,7 +27,7 @@
 #endif
 
 #include "lvgl_helpers.h"
-#define OPERATE_SENSITIVITY 5
+#define OPERATE_SENSITIVITY 300
 
 
 uint8_t s_example_broadcast_mac[ESP_NOW_ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
@@ -219,7 +219,7 @@ void stateInit()
     task_list = NULL;
     tasklen = 0;
     chosenTaskNum = lastChosenTaskNum = 0;
-    TimeCountdown = TimeCountdownOffset = 120;
+    TimeCountdown = TimeCountdownOffset = 600;
     LastTimeCountdown = 0;
     _button_tick_buf = 0;
     TimeTick = 0;
@@ -269,7 +269,7 @@ void Enter(ELABEL_STATE state)
         statetype = 0;
         EncoderValue = lastEncoderValue = 0;
         needFlashEpaper = true;
-        TimeCountdownOffset = TimeCountdown = 120;
+        TimeCountdownOffset = TimeCountdown = 600;
         _button_tick_buf = TimeTick;
         break;
     case Focus:

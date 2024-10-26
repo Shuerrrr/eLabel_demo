@@ -397,7 +397,81 @@ static void buzzer_pwm_start(uint32_t new_frequency)
 /**********************
  *   APPLICATION MAIN
  **********************/
+#define BUZZER_ON_DURATION_SHORT 50  // 0.5秒
+#define BUZZER_ON_DURATION_LONG 100  // 1秒
+#define BUZZER_ON_DURATION_EXTRA_LONG 200  // 2秒
+#define BUZZER_OFF_DURATION 20  // 0.2秒
 bool connectwifi_onetime = true;
+
+uint16_t buzzer_start_tick = 0;
+uint16_t buzzer_count = 0;
+typedef enum {
+    BUZZER_STATE_OFF,
+    BUZZER_STATE_ON_SHORT,
+    BUZZER_STATE_ON_LONG,
+    BUZZER_STATE_ON_EXTRA_LONG,
+    BUZZER_STATE_OFF_SHORT,
+    BUZZER_STATE_OFF_LONG,
+    BUZZER_STATE_OFF_EXTRA_LONG
+} buzzer_state_t;
+
+buzzer_state_t buzzer_state = BUZZER_STATE_OFF;
+
+void update_buzzer_state(uint16_t whiletick, uint16_t duration, uint16_t count)
+{
+    switch (buzzer_state)
+    {
+        case BUZZER_STATE_OFF:
+            if (TimeCountdown % duration == 0)
+            {
+                buzzer_pwm_start(1000);
+                buzzer_state = BUZZER_STATE_ON_SHORT;
+                buzzer_start_tick = whiletick;
+                buzzer_count = count;
+            }
+            break;
+        case BUZZER_STATE_ON_SHORT:
+            if (whiletick - buzzer_start_tick >= BUZZER_ON_DURATION_SHORT)
+            {
+                buzzer_pwm_start(0);
+                buzzer_state = BUZZER_STATE_OFF_SHORT;
+                buzzer_start_tick = whiletick;
+            }
+            break;
+        case BUZZER_STATE_OFF_SHORT:
+            if (whiletick - buzzer_start_tick >= BUZZER_OFF_DURATION)
+            {
+                if (--buzzer_count > 0)
+                {
+                    buzzer_pwm_start(1000);
+                    buzzer_state = BUZZER_STATE_ON_SHORT;
+                    buzzer_start_tick = whiletick;
+                }
+                else
+                {
+                    buzzer_state = BUZZER_STATE_OFF;
+                }
+            }
+            break;
+        case BUZZER_STATE_ON_LONG:
+            if (whiletick - buzzer_start_tick >= BUZZER_ON_DURATION_LONG)
+            {
+                buzzer_pwm_start(0);
+                buzzer_state = BUZZER_STATE_OFF;
+            }
+            break;
+        case BUZZER_STATE_ON_EXTRA_LONG:
+            if (whiletick - buzzer_start_tick >= BUZZER_ON_DURATION_EXTRA_LONG)
+            {
+                buzzer_pwm_start(0);
+                buzzer_state = BUZZER_STATE_OFF;
+            }
+            break;
+        default:
+            break;
+    }
+}
+
 void app_main() {
 
     /* If you want to use a task to create the graphic, you NEED to create a Pinned task
@@ -439,17 +513,42 @@ void app_main() {
     refresh_slave_tasklist_flag = true;
     char sstr[12];
     UBaseType_t istack;
+    uint16_t buzzer_tick = 0;
     while(1)
     {
         whiletick++;
         // pressed = gpio_get_level(BUTTON_GPIO1);
         // vTaskDelay(1000 / portTICK_RATE_MS);
         vTaskDelay(10 / portTICK_PERIOD_MS);
-        if(whiletick % 100 == 0)
+        if(label_state == Focus)
         {
-            // istack = uxTaskGetStackHighWaterMark(pxespnowTask);
-            // printf("task espnow stack = %d\n",istack);
+            if (TimeCountdown >= 300)
+            {
+                update_buzzer_state(whiletick, 300, 1);
+            }
+            else if (TimeCountdown >= 60)
+            {
+                update_buzzer_state(whiletick, 60, 2);
+            }
+            else if (TimeCountdown > 0)
+            {
+                update_buzzer_state(whiletick, 10, 3);
+            }
+            else if (TimeCountdown == 0)
+            {
+                if (whiletick % 1000 == 0)
+                {
+                    buzzer_pwm_start(1000);
+                    buzzer_tick = whiletick;
+                }
+                else if(whiletick - buzzer_tick >= 200)
+                {
+                    buzzer_pwm_start(0);
+                }
+
+            }
         }
+
         //当连上网之后有一些重要事情要做，比如获取最新版本
         if(get_wifi_status() == 2)
         {
