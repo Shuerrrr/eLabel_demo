@@ -601,7 +601,7 @@ void sync_to_slaves_callback(const char *task_content,const uint8_t *recv_mac)
         example_espnow_event_send_cb_t *send_cb = &evt.info.send_cb;
 
         if (mac_addr == NULL) {
-            // ESP_LOGE(TAG, "Send cb arg error");
+            ESP_LOGE("fuck", "Send cb arg error");
             return;
         }
 
@@ -814,9 +814,8 @@ void sync_recv_update()
         break;
     }
 
-    if(slave_num && espnow_recv_buf.msg_type && refresh_slave_tasklist_flag)
+    if(slave_num && espnow_recv_buf.msg_type && espnow_send_buf.espnow_callback_flag)
     {
-
         espnow_send_buf.msg_type = espnow_recv_buf.msg_type;
         espnow_send_buf.task_method = espnow_recv_buf.task_method;
         espnow_send_buf.elabel_state = espnow_recv_buf.elabel_state;
@@ -824,7 +823,12 @@ void sync_recv_update()
         espnow_send_buf.TimeCountdown = espnow_recv_buf.TimeCountdown;
         espnow_send_buf.changeTaskId = espnow_recv_buf.changeTaskId;
 
+        if(last_recv_mac[0] == 0)
+        {
+            ESP_LOGI("fuuck","fuck you");
+        }
         sync_to_slaves_callback((char*)espnow_recv_buf.payload,last_recv_mac);
+
     }
 
     espnow_send_buf_reset(&espnow_recv_buf);

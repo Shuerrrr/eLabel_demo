@@ -425,7 +425,7 @@ void app_main() {
         vTaskDelay(10 / portTICK_PERIOD_MS);
         if(whiletick % 100 == 0)
         {
-            istack = uxTaskGetStackHighWaterMark(pxespnowTask);
+            // istack = uxTaskGetStackHighWaterMark(pxespnowTask);
             // printf("task espnow stack = %d\n",istack);
         }
         //当连上网之后有一些重要事情要做，比如获取最新版本
@@ -436,7 +436,7 @@ void app_main() {
         }
         else if(get_wifi_status() == 0)
         {
-            esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
+            // esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
             stop_mainTask = false;
         }
         else if(get_wifi_status() == 1)
