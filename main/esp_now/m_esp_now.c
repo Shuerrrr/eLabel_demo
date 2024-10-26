@@ -288,7 +288,9 @@ static void example_espnow_task(void *pvParameter)
                         // }
                     }
                     else if (ret == EXAMPLE_ESPNOW_DATA_UNICAST) {
+                        espnow_send_buf.espnow_callback_flag = 1;
                         ESP_LOGI(TAG, "Receive %dth unicast data from: "MACSTR", len: %d", recv_seq, MAC2STR(recv_cb->mac_addr), recv_cb->data_len);
+                        memcpy(last_recv_mac,recv_cb->mac_addr,6);
                         //配对后收到的unicast数据
                         /* If receive unicast ESPNOW data, also stop sending broadcast ESPNOW data. */
                         send_param->broadcast = false;
@@ -439,7 +441,7 @@ esp_err_t example_espnow_init(void)
     }
     memcpy(send_param->dest_mac, s_example_broadcast_mac, ESP_NOW_ETH_ALEN);
     example_espnow_data_prepare(send_param);
-
+    
     xTaskCreate(example_espnow_task, "example_espnow_task", 20000, send_param, 0, &pxespnowTask);
 
     return ESP_OK;
