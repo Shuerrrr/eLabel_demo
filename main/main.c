@@ -159,6 +159,7 @@ void e_label_init()
                 break;
             }
         }
+        _ui_screen_change(&ui_Screen1, LV_SCR_LOAD_ANIM_NONE, 500, 500, &ui_Screen1_screen_init);
         EncoderValue = lastEncoderValue = 0;
         stop_mainTask = false;
     }
@@ -387,6 +388,12 @@ static void buzzer_pwm_init()
     ledc_channel_config(&ledc_channel);
 }
 
+static void buzzer_pwm_stop()
+{
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+}
+
 static void buzzer_pwm_start(uint32_t new_frequency)
 {
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 700);
@@ -433,7 +440,7 @@ void update_buzzer_state(uint16_t whiletick, uint16_t duration, uint16_t count)
         case BUZZER_STATE_ON_SHORT:
             if (whiletick - buzzer_start_tick >= BUZZER_ON_DURATION_SHORT)
             {
-                buzzer_pwm_start(0);
+                buzzer_pwm_stop();
                 buzzer_state = BUZZER_STATE_OFF_SHORT;
                 buzzer_start_tick = whiletick;
             }
@@ -456,14 +463,14 @@ void update_buzzer_state(uint16_t whiletick, uint16_t duration, uint16_t count)
         case BUZZER_STATE_ON_LONG:
             if (whiletick - buzzer_start_tick >= BUZZER_ON_DURATION_LONG)
             {
-                buzzer_pwm_start(0);
+                buzzer_pwm_stop();
                 buzzer_state = BUZZER_STATE_OFF;
             }
             break;
         case BUZZER_STATE_ON_EXTRA_LONG:
             if (whiletick - buzzer_start_tick >= BUZZER_ON_DURATION_EXTRA_LONG)
             {
-                buzzer_pwm_start(0);
+                buzzer_pwm_stop();
                 buzzer_state = BUZZER_STATE_OFF;
             }
             break;
@@ -543,7 +550,7 @@ void app_main() {
                 }
                 else if(whiletick - buzzer_tick >= 200)
                 {
-                    buzzer_pwm_start(0);
+                    buzzer_pwm_stop();
                 }
 
             }

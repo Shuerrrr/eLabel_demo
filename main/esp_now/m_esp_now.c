@@ -190,38 +190,43 @@ static void example_espnow_task(void *pvParameter)
                                     continue;
                                 }
                             }
-                            vTaskDelay(20 / portTICK_PERIOD_MS);
-                            uint8_t *mac_addrrr = slave_mac[i];
-                            ESP_LOGI(TAG, "send data to "MACSTR"", MAC2STR(mac_addrrr));
-                            memcpy(send_param->dest_mac, mac_addrrr, ESP_NOW_ETH_ALEN);
 
-                            /* Send the next data after the previous data is sent. */
-                            printf("send_param->len = %d\n",send_param->len);
-
-                            if (send_param->dest_mac == NULL) {
-                                ESP_LOGE(TAG, "Send callback: MAC address is NULL");
-                                return;
-                            }
-                            else if(send_param->buffer == NULL) {
-                                ESP_LOGE(TAG, "Send callback: data is NULL");
-                                return;
-                            }
-                            else
+                            for(int j = 0; j < 10 ;j++)
                             {
-                                ESP_LOGE(TAG,"Send callback: MAC address: %02x:%02x:%02x:%02x:%02x:%02x",
-                                send_param->dest_mac[0], send_param->dest_mac[1],send_param->dest_mac[2], send_param->dest_mac[3], send_param->dest_mac[4], send_param->dest_mac[5]);
-                                for (int i = 0; i < send_param->len; i++) {
-                                    printf("%02x ", send_param->buffer[i]);
+                                vTaskDelay(100 / portTICK_PERIOD_MS);
+                                uint8_t *mac_addrrr = slave_mac[i];
+                                ESP_LOGI(TAG, "send data to "MACSTR"", MAC2STR(mac_addrrr));
+                                memcpy(send_param->dest_mac, mac_addrrr, ESP_NOW_ETH_ALEN);
+
+                                /* Send the next data after the previous data is sent. */
+                                printf("send_param->len = %d\n",send_param->len);
+
+                                if (send_param->dest_mac == NULL) {
+                                    ESP_LOGE(TAG, "Send callback: MAC address is NULL");
+                                    return;
+                                }
+                                else if(send_param->buffer == NULL) {
+                                    ESP_LOGE(TAG, "Send callback: data is NULL");
+                                    return;
+                                }
+                                else
+                                {
+                                    ESP_LOGE(TAG,"Send callback: MAC address: %02x:%02x:%02x:%02x:%02x:%02x",
+                                    send_param->dest_mac[0], send_param->dest_mac[1],send_param->dest_mac[2], send_param->dest_mac[3], send_param->dest_mac[4], send_param->dest_mac[5]);
+                                    for (int i = 0; i < send_param->len; i++) {
+                                        printf("%02x ", send_param->buffer[i]);
+                                    }
+                                }
+                                ESP_LOGE(TAG,"wocaonima");
+
+                                if (esp_now_send(send_param->dest_mac, send_param->buffer, send_param->len) != ESP_OK) {
+                                    ESP_LOGE(TAG, "Send error");
+                                    // example_espnow_deinit(send_param);
+                                    // vTaskDelete(NULL);
+                                    continue;
                                 }
                             }
-                            ESP_LOGE(TAG,"wocaonima");
-
-                            if (esp_now_send(send_param->dest_mac, send_param->buffer, send_param->len) != ESP_OK) {
-                                ESP_LOGE(TAG, "Send error");
-                                // example_espnow_deinit(send_param);
-                                // vTaskDelete(NULL);
-                                continue;
-                            }
+                            
                         }
                         break;
                     }

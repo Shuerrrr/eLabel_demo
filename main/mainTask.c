@@ -89,6 +89,13 @@ void modify_task(TaskNode *head, int position, const char *task_content) {
 
 // 添加任务到链表末尾
 void add_task(TaskNode **head, const char *task_content) {
+
+    if(get_task_position(*head,task_content) != -1)
+    {
+        printf("任务已存在！\n");
+        return;
+    }
+
     TaskNode *new_task = create_task(task_content);
     if (*head == NULL) {
         *head = new_task;  // 如果链表为空，设置为头结点
@@ -107,6 +114,12 @@ void add_task(TaskNode **head, const char *task_content) {
 void delete_task(TaskNode **head, int position) {
     if (*head == NULL) {
         printf("任务列表为空，无法删除任务！\n");
+        return;
+    }
+
+    if(position >= tasklen || position < 0)
+    {
+        printf("指定位置的任务不存在！\n");
         return;
     }
 
@@ -181,6 +194,24 @@ char* find_task_by_position(TaskNode *head, int position) {
 
     // 如果超出了链表长度，返回 NULL
     return NULL;
+}
+
+int get_task_position(TaskNode *head, const char *task_content)
+{
+    TaskNode *temp = head;
+    int index = 0;
+
+    // 遍历链表直到找到指定位置的任务
+    while (temp != NULL) {
+        if (strcmp(temp->task,task_content) == 0) {
+            return index;  // 找到任务，返回节点指针
+        }
+        temp = temp->next;
+        index++;
+    }
+
+    // 如果超出了链表长度，返回 NULL
+    return -1;
 }
 
 void tasks2str(TaskNode *head)
@@ -512,7 +543,8 @@ void Execute()
                         espnow_send_buf.elabel_state = 1;
                         espnow_send_buf.task_method = 3;
                         espnow_send_buf.chosenTaskId = chosenTaskNum;
-                        sync_to_slaves(NULL);
+                        sync_to_slaves(find_task_by_position(task_list,chosenTaskNum));
+                        // sync_to_slaves(NULL);
 
                         continue;
                     }
@@ -725,7 +757,8 @@ void sync_recv_update()
         }
         else if(espnow_recv_buf.task_method == 3)
         {
-            delete_task(&task_list, espnow_recv_buf.changeTaskId);
+            int index = get_task_position(task_list, (char*)espnow_recv_buf.payload);
+            delete_task(&task_list, index);
             tasks2str(task_list);
             lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
         }
@@ -759,7 +792,8 @@ void sync_recv_update()
         }
         else if(espnow_recv_buf.task_method == 3 && label_state == Focus)
         {
-            delete_task(&task_list, espnow_recv_buf.changeTaskId);
+            int index = get_task_position(task_list, (char*)espnow_recv_buf.payload);
+            delete_task(&task_list, index);
             tasks2str(task_list);
             lv_roller_set_options(ui_Roller1, taskstr, LV_ROLLER_MODE_NORMAL);
         }
@@ -858,7 +892,8 @@ APP_task_state APP_TASK(void)
                 espnow_send_buf.task_method = 3;
                 espnow_send_buf.changeTaskId = i;
                 i--;
-                sync_to_slaves(NULL);
+                sync_to_slaves(find_task_by_position(task_list, i));
+                // sync_to_slaves(NULL);
             }
         }
         for(int i = tasklen;i < todolist->size;i++)
@@ -904,7 +939,8 @@ APP_task_state APP_TASK(void)
                 espnow_send_buf.task_method = 3;
                 espnow_send_buf.changeTaskId = i;
                 i--;
-                sync_to_slaves(NULL);
+                sync_to_slaves(find_task_by_position(task_list, i));
+                // sync_to_slaves(NULL);
             }
         }
 

@@ -90,6 +90,9 @@ void print_tasks(TaskNode *head);
 void free_tasks(TaskNode *head);
 
 char* find_task_by_position(TaskNode *head, int position);
+
+int get_task_position(TaskNode *head, const char *task_content);
+
 void tasks2str(TaskNode *head);
 
 typedef struct{
