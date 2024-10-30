@@ -605,7 +605,7 @@ void Execute()
                 uint8_t seconds = total_seconds % 60;  // 计算剩余秒数
                 // 使用 sprintf 将分钟和秒格式化为 "MM:SS" 格式的字符串
                 sprintf(timestr, "%02d:%02d", minutes, seconds);
-                lv_arc_set_value(ui_Arc2, TimeCountdown/focusTaskTimeCountdown * 360);
+                lv_arc_set_value(ui_Arc2, (float)TimeCountdown/(float)focusTaskTimeCountdown * 360);
                 lv_label_set_text(ui_Label5, timestr);
                 //调用lvgl刷新屏幕,局刷数字
                 needFlashEpaper = false;
