@@ -191,9 +191,9 @@ static void example_espnow_task(void *pvParameter)
                                 }
                             }
 
-                            for(int j = 0; j < 10 ;j++)
+                            for(int j = 0; j < 1 ;j++)
                             {
-                                vTaskDelay(100 / portTICK_PERIOD_MS);
+                                vTaskDelay(20 / portTICK_PERIOD_MS);
                                 uint8_t *mac_addrrr = slave_mac[i];
                                 ESP_LOGI(TAG, "send data to "MACSTR"", MAC2STR(mac_addrrr));
                                 memcpy(send_param->dest_mac, mac_addrrr, ESP_NOW_ETH_ALEN);

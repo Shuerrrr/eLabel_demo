@@ -22,11 +22,23 @@ void ui_Screen3_screen_init(void)
     ui_Label7 = lv_label_create(ui_Screen3);
     lv_obj_set_width(ui_Label7, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_Label7, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_Label7, 2);
-    lv_obj_set_y(ui_Label7, -36);
+    lv_obj_set_x(ui_Label7, -2);
+    lv_obj_set_y(ui_Label7, -21);
     lv_obj_set_align(ui_Label7, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_Label7, "			Task1\n\n\n\nTimeCountdown:");
+    lv_label_set_text(ui_Label7, "			Task1\n\n\nTimeCountdown:");
     lv_obj_set_style_text_font(ui_Label7, &lv_font_montserrat_20, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    ui_Arc2 = lv_arc_create(ui_Screen3);
+    lv_obj_set_width(ui_Arc2, 239);
+    lv_obj_set_height(ui_Arc2, 266);
+    lv_obj_set_x(ui_Arc2, -1);
+    lv_obj_set_y(ui_Arc2, 11);
+    lv_obj_set_align(ui_Arc2, LV_ALIGN_CENTER);
+    lv_arc_set_range(ui_Arc2, 0, 360);
+    lv_arc_set_value(ui_Arc2, 1);
+    lv_arc_set_bg_angles(ui_Arc2, 0, 360);
+    lv_arc_set_rotation(ui_Arc2, -90);
+
 
     lv_obj_add_event_cb(ui_Screen3, ui_event_Screen3, LV_EVENT_ALL, NULL);
 

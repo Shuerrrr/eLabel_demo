@@ -15,6 +15,8 @@ void ui_event_Screen1(lv_event_t * e);
 lv_obj_t * ui_Screen1;
 lv_obj_t * ui_Roller1;
 lv_obj_t * ui_Label8;
+lv_obj_t * ui_Label6;
+lv_obj_t * ui_Label12;
 
 
 // SCREEN: ui_Screen2
@@ -35,6 +37,20 @@ void ui_event_Screen3(lv_event_t * e);
 lv_obj_t * ui_Screen3;
 lv_obj_t * ui_Label5;
 lv_obj_t * ui_Label7;
+lv_obj_t * ui_Arc2;
+
+
+// SCREEN: ui_Screen4
+void ui_Screen4_screen_init(void);
+lv_obj_t * ui_Screen4;
+lv_obj_t * ui_Label1;
+lv_obj_t * ui_Label4;
+
+
+// SCREEN: ui_Screen5
+void ui_Screen5_screen_init(void);
+lv_obj_t * ui_Screen5;
+lv_obj_t * ui_Label11;
 lv_obj_t * ui____initial_actions0;
 const lv_img_dsc_t * ui_imgset_1598583580[1] = {&ui_img_1859145046};
 
@@ -105,6 +121,8 @@ void ui_init(void)
     ui_Screen1_screen_init();
     ui_Screen2_screen_init();
     ui_Screen3_screen_init();
+    ui_Screen4_screen_init();
+    ui_Screen5_screen_init();
     ui____initial_actions0 = lv_obj_create(NULL);
     lv_disp_load_scr(ui_Screen1);
 }
